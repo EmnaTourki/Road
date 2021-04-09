@@ -1,6 +1,10 @@
 build
 .DS_store
 lib 
+mini_projet/Makefile
+*.launch
+*.xml
+*.project
 
 
 
