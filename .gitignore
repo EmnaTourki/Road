@@ -5,8 +5,7 @@ mini_projet/Makefile
 *.launch
 *.xml
 *.project
-
-
+*.cproject
 
 # Prerequisites
 *.d
