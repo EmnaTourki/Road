@@ -5,41 +5,61 @@
 
 #include <main.h>
 #include <motors.h>
+#include <leds.h>
 #include <sensors/VL53L0X/VL53L0X.h>
 #include <sensors/proximity.h>
 #include <move.h>
 #include <audio_processing.h>
 
 #define DEFAULT_SPEED			0.7 * MOTOR_SPEED_LIMIT // step/s
-
-#define INSTRUCTION_OBS_DIST	150 // mm
+#define OBS_DIST_15cm			150 // en mm
+#define OBS_DIST_35cm			350 // en mm
+#define PLACE_DIM_MIN 			450 // en step
+#define nb_tour_aller			2
 
 static int16_t leftSpeed = 0, rightSpeed = 0;
 static bool done=true;
+static bool parkdone=false;
 
-
-//returns true if an obstacle is 15 cm away
-bool obstacle_detected(void){
-	return (VL53L0X_get_dist_mm()>=(INSTRUCTION_OBS_DIST-10))
-			&& (VL53L0X_get_dist_mm()<=(INSTRUCTION_OBS_DIST+10));
+//returns true if an obstacle is obs_dist mm away
+bool obstacle_detected(int16_t obs_dist){
+	return (VL53L0X_get_dist_mm()>=(obs_dist-20))
+			&& (VL53L0X_get_dist_mm()<=(obs_dist+20));
 }
 
 bool end_left_wall(void){
-	return ((get_calibrated_prox(IR6)>50)&&(get_calibrated_prox(IR6)<100)&&(get_calibrated_prox(IR7)<15));
+	static bool walldetected=0;
+	if (get_calibrated_prox(IR6)>500){
+		walldetected=true;
+	}
+	if	((walldetected)&&(get_calibrated_prox(IR6)<150)&&(get_calibrated_prox(IR7)<15)){
+		walldetected=false;
+		return true;
+	}else{
+			return false;
+	}
+
 }
 
 bool end_right_wall(void){
-	return ((get_calibrated_prox(IR3)>200)&&(get_calibrated_prox(IR3)<300)&&(get_calibrated_prox(IR2)<15));
+	static bool walldetected=0;
+	if (get_calibrated_prox(IR3)>500){
+		walldetected=true;
+	}
+	if	((walldetected)&&(get_calibrated_prox(IR3)<150)&&(get_calibrated_prox(IR2)<15)){
+		walldetected=false;
+		return true;
+	}else{
+			return false;
+	}
+
 }
 
 
 void rotate_right(void){
 
-	leftSpeed=0.5*MOTOR_SPEED_LIMIT;
+	leftSpeed=0.45*MOTOR_SPEED_LIMIT;
 	rightSpeed =0.5*MOTOR_SPEED_LIMIT - 1*get_calibrated_prox(IR8) - 0.5*get_calibrated_prox(IR7);
-
-	left_motor_set_speed(leftSpeed);
-	right_motor_set_speed(rightSpeed);
 
 	if (end_left_wall()){
 		done=true;
@@ -49,12 +69,8 @@ void rotate_right(void){
 
 void rotate_left(void){
 
-
 	leftSpeed=0.5*MOTOR_SPEED_LIMIT- 1*get_calibrated_prox(IR1) - 0.5*get_calibrated_prox(IR2);
-	rightSpeed =0.5*MOTOR_SPEED_LIMIT;
-
-	left_motor_set_speed(leftSpeed);
-	right_motor_set_speed(rightSpeed);
+	rightSpeed =0.45*MOTOR_SPEED_LIMIT;
 
 	if (end_right_wall()){
 			done=true;
@@ -62,7 +78,7 @@ void rotate_left(void){
 
 }
 
-void rond_point(void){
+void rond_point(uint8_t max_turns){
 	static uint8_t nb_turn=0;
 	static bool turningleft=0;
 
@@ -72,7 +88,7 @@ void rond_point(void){
 	}
 	if( end_left_wall() && (!turningleft))
 	{
-			if(nb_turn==2){
+			if(nb_turn==max_turns){
 			done=1;
 			nb_turn=0,turningleft=false;
 			}else{
@@ -82,20 +98,74 @@ void rond_point(void){
 	if(turningleft){
 		leftSpeed=0.1*MOTOR_SPEED_LIMIT;
 		rightSpeed =0.5*MOTOR_SPEED_LIMIT;
-		if(get_calibrated_prox(IR7)>600){
-			nb_turn++;
+		if(get_calibrated_prox(IR7)>500){
 			turningleft=false;
+			nb_turn++;
 		}
-	}else if((!turningleft)&&(nb_turn>=1)){
-		leftSpeed= 0.45*MOTOR_SPEED_LIMIT;
-		rightSpeed =0.5*MOTOR_SPEED_LIMIT-1*get_calibrated_prox(IR8) - 0.5*get_calibrated_prox(IR7);
 	}
-
+	else if( (!turningleft)&&(nb_turn>=1)){
+		leftSpeed= 0.45*MOTOR_SPEED_LIMIT;
+		rightSpeed =0.5*MOTOR_SPEED_LIMIT-0.5*get_calibrated_prox(IR8)- 0.25*get_calibrated_prox(IR7);
+	}
 }
+
+bool find_a_place(void){
+	static int32_t debut=0 , fin=0, empty_space_dimension=-1;
+	leftSpeed=0.5*MOTOR_SPEED_LIMIT-0.5*get_calibrated_prox(IR1)- 0.25*get_calibrated_prox(IR2);
+	rightSpeed =0.45*MOTOR_SPEED_LIMIT;
+	if (end_right_wall()&&(!debut)){
+		debut=left_motor_get_pos();
+		set_led(LED5,1);
+	}
+	if(debut && (!fin) && (get_calibrated_prox(IR3)>500)){
+		fin=left_motor_get_pos();
+		empty_space_dimension=fin-debut;
+		debut=0,fin=0;
+		set_led(LED5,0);
+	}
+	if(empty_space_dimension>=PLACE_DIM_MIN){
+		empty_space_dimension=-1;
+		return true;
+	}else{
+		empty_space_dimension=-1;
+		return false;
+	}
+}
+
+
+void park(void){
+	static bool place_found=0, tourne_marche_arriere=true;
+
+	if (place_found){
+
+		if(tourne_marche_arriere){
+			leftSpeed=-0.5*MOTOR_SPEED_LIMIT;
+			rightSpeed =-0.13*MOTOR_SPEED_LIMIT;
+			if (get_calibrated_prox(IR4)>150){
+				tourne_marche_arriere=false;
+				}
+		}else if(!tourne_marche_arriere){
+			leftSpeed=-0.5*MOTOR_SPEED_LIMIT+5*get_calibrated_prox(IR4);
+			rightSpeed =-0.5*MOTOR_SPEED_LIMIT+0.25*get_calibrated_prox(IR2);
+			if( (get_calibrated_prox(IR4)<15)&&(get_calibrated_prox(IR2)>150) ){
+				tourne_marche_arriere=true;
+				place_found=false;
+				parkdone=true;
+				}
+			}
+	}else{
+		place_found=find_a_place();
+	}
+}
+
+
+
+
 
 void send_to_computer(TO_DO instruction){
 	static uint8_t mustSend = 0;
 	if(mustSend > 8){
+	//chprintf((BaseSequentialStream *)&SD3, "place dimension= %d \r\n",empty_space_dimension);
 	chprintf((BaseSequentialStream *)&SD3, "INSTRUCTION= %d,distance= %d \r\n",instruction,VL53L0X_get_dist_mm());
 	chprintf((BaseSequentialStream *)&SD3, "speed\r\n");
 	chprintf((BaseSequentialStream *)&SD3, "%4d,%4d,\r\n\n",leftSpeed,rightSpeed);
@@ -114,25 +184,33 @@ static THD_FUNCTION(Movement, arg) {
 
     systime_t time;
     static TO_DO instruction=0;
+    done=true;
+    parkdone=false;
 
     //waits until a start signal (FREQ_START sound) is detected
 	wait_start_signal();
-
+	calibrate_ir();
 
     while(1){
     	time = chVTGetSystemTime();
-/*
-		if (get_next_instruction()==START){
-			chprintf((BaseSequentialStream *)&SD3, "START %f  \n", get_norm());
-			left_motor_set_speed(DEFAULT_SPEED);
-			right_motor_set_speed(DEFAULT_SPEED);
-		 }
-*/
 
-    	if (obstacle_detected()&& done){
-			instruction=get_next_instruction();
-			done=false;
-		}
+    	if (done) {
+    		if ( obstacle_detected(OBS_DIST_35cm) && (get_next_instruction()== PARK) ){
+    				instruction=PARK;
+    				done=false;
+    		}else if (obstacle_detected(OBS_DIST_15cm)){
+    			instruction=get_next_instruction();
+    			done=false;
+    		}else{
+    			leftSpeed=DEFAULT_SPEED;
+    			rightSpeed=DEFAULT_SPEED;
+    		}
+    	}
+
+
+    	//instruction=PARK;
+    	//done=false;
+
 		if (!done){
 			switch (instruction)
 			{
@@ -143,9 +221,10 @@ static THD_FUNCTION(Movement, arg) {
 					rotate_left();
 					break;
 				case RONDPOINT:
-					rond_point();
+					rond_point(nb_tour_aller);
 					break;
 				case PARK:
+					park();
 					break;
 				case STOP:
 					left_motor_set_speed(0);
@@ -156,17 +235,18 @@ static THD_FUNCTION(Movement, arg) {
 					right_motor_set_speed(0);
 					break;
 			}
-
-
-		}
-		if (done){
-			leftSpeed=DEFAULT_SPEED;
-			rightSpeed =DEFAULT_SPEED;
 		}
 
     	send_to_computer(instruction);
+
+    	if (parkdone){
+    		leftSpeed=0;
+    		rightSpeed=0;
+    	}
+
     	left_motor_set_speed(leftSpeed);
     	right_motor_set_speed(rightSpeed);
+
     	chThdSleepUntilWindowed(time, time + MS2ST(10)); // Refresh @ 100 Hz
     }
  }

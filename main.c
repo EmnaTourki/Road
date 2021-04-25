@@ -53,9 +53,9 @@ int main(void)
     motors_init();
     //inits and starts the distance sensor(TOF) to continuoulsy measure the distance.
     VL53L0X_start();
-    // Starts the proximity measurement module AND calibrate the sensors
+    // Starts the proximity measurement module
     proximity_start();
-    calibrate_ir();
+
     //starts the microphones processing thread.
     //it calls the callback given in parameter when samples are ready
     mic_start(&processAudioData);
