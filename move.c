@@ -11,11 +11,12 @@
 #include <move.h>
 #include <audio_processing.h>
 
-#define DEFAULT_SPEED			0.7 * MOTOR_SPEED_LIMIT // step/s
-#define OBS_DIST_15cm			150 // en mm
-#define OBS_DIST_35cm			350 // en mm
-#define PLACE_DIM_MIN 			450 // en step
-#define nb_tour_aller			2
+#define DEFAULT_SPEED			0.7 * MOTOR_SPEED_LIMIT 	// in step/s
+#define OBS_DIST_15cm			150 						// in mm
+#define OBS_DIST_35cm			350 						// in mm
+#define PLACE_DIM_MIN 			450 						// in step
+#define nb_tour_aller			3
+#define nb_tour_retour			1
 
 static int16_t leftSpeed = 0, rightSpeed = 0;
 static bool done=true;
@@ -80,21 +81,13 @@ void rotate_left(void){
 
 void rond_point(uint8_t max_turns){
 	static uint8_t nb_turn=0;
-	static bool turningleft=0;
-
+	static bool turningleft=0,reset_position=0;
+	static int32_t debut=0 , fin=0, dimension=1000;
 	if(nb_turn==0){
 		leftSpeed= 0.45*MOTOR_SPEED_LIMIT;
 		rightSpeed =0.5*MOTOR_SPEED_LIMIT-1*get_calibrated_prox(IR8) - 0.5*get_calibrated_prox(IR7);
 	}
-	if( end_left_wall() && (!turningleft))
-	{
-			if(nb_turn==max_turns){
-			done=1;
-			nb_turn=0,turningleft=false;
-			}else{
-			turningleft=true;
-			}
-	}
+
 	if(turningleft){
 		leftSpeed=0.1*MOTOR_SPEED_LIMIT;
 		rightSpeed =0.5*MOTOR_SPEED_LIMIT;
@@ -103,9 +96,36 @@ void rond_point(uint8_t max_turns){
 			nb_turn++;
 		}
 	}
-	else if( (!turningleft)&&(nb_turn>=1)){
-		leftSpeed= 0.45*MOTOR_SPEED_LIMIT;
-		rightSpeed =0.5*MOTOR_SPEED_LIMIT-0.5*get_calibrated_prox(IR8)- 0.25*get_calibrated_prox(IR7);
+	else if( (!turningleft)){
+		if( end_left_wall() && (nb_turn!=max_turns)){
+			turningleft=true;
+		}
+		if (nb_turn>=1){
+			leftSpeed= 0.45*MOTOR_SPEED_LIMIT;
+			rightSpeed =0.5*MOTOR_SPEED_LIMIT-0.5*get_calibrated_prox(IR8)- 0.25*get_calibrated_prox(IR7);
+			if((nb_turn==1)&&(!debut)){
+				debut=left_motor_get_pos();
+			}
+			if((nb_turn==2)&&(debut)&&(!fin)){
+				fin=left_motor_get_pos();
+				dimension=fin-debut;
+			}
+			if((nb_turn==max_turns)){
+				if(!reset_position){
+					left_motor_set_pos(0);
+					right_motor_set_pos(0);
+					reset_position=true;
+				}else if((reset_position)&&(left_motor_get_pos()>(0.5*dimension))){
+					leftSpeed= 0.5*MOTOR_SPEED_LIMIT-0.4*get_calibrated_prox(IR4);
+					rightSpeed =0.5*MOTOR_SPEED_LIMIT-1.2*get_calibrated_prox(IR6) - 0.4*get_calibrated_prox(IR5);
+					if((get_calibrated_prox(IR4)>(get_calibrated_prox(IR5)-100))&&(get_calibrated_prox(IR4)<(get_calibrated_prox(IR5)+100))&&(get_calibrated_prox(IR4)>600)){
+						done=1;
+						nb_turn=0,debut=0,fin=0,turningleft=false,reset_position=false;
+					}
+				}
+			}
+
+		}
 	}
 }
 
@@ -207,11 +227,7 @@ static THD_FUNCTION(Movement, arg) {
     		}
     	}
 
-
-    	//instruction=PARK;
-    	//done=false;
-
-		if (!done){
+		if ((!done)&&(!parkdone)){
 			switch (instruction)
 			{
 				case TURN_RIGHT:
