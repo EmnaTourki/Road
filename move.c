@@ -11,16 +11,25 @@
 #include <move.h>
 #include <audio_processing.h>
 
-#define DEFAULT_SPEED			0.7 * MOTOR_SPEED_LIMIT 	// in step/s
-#define OBS_DIST_15cm			150 						// in mm
-#define OBS_DIST_35cm			350 						// in mm
-#define PLACE_DIM_MIN 			450 						// in step
+#define PI                  	3.1415926536f
+#define WHEEL_DISTANCE      	5.3f   					//cm
+#define PERIMETER_EPUCK     	(PI * WHEEL_DISTANCE)
+#define NSTEP_ONE_TURN      	1000 						// number of step for 1 turn of the motor
+#define WHEEL_PERIMETER			13 							// cm
+#define POSITION_ROTATION_90 	(0.25*PERIMETER_EPUCK) * NSTEP_ONE_TURN / WHEEL_PERIMETER
+
+#define DEFAULT_SPEED			0.7 * MOTOR_SPEED_LIMIT 	// step/s
+#define OBS_DIST_15cm			150 						// mm
+#define OBS_DIST_38cm			380							// mm
+#define PLACE_DIM_MIN 			450 						// step
 #define nb_tour_aller			3
 #define nb_tour_retour			1
 
 static int16_t leftSpeed = 0, rightSpeed = 0;
 static bool done=true;
 static bool parkdone=false;
+static int32_t to_computer_dim=0;
+
 
 //returns true if an obstacle is obs_dist mm away
 bool obstacle_detected(int16_t obs_dist){
@@ -82,7 +91,7 @@ void rotate_left(void){
 void rond_point(uint8_t max_turns){
 	static uint8_t nb_turn=0;
 	static bool turningleft=0,reset_position=0;
-	static int32_t debut=0 , fin=0, dimension=1000;
+	static int32_t debut=0 ,fin=0,position_to_reach=1000;
 	if(nb_turn==0){
 		leftSpeed= 0.45*MOTOR_SPEED_LIMIT;
 		rightSpeed =0.5*MOTOR_SPEED_LIMIT-1*get_calibrated_prox(IR8) - 0.5*get_calibrated_prox(IR7);
@@ -102,29 +111,30 @@ void rond_point(uint8_t max_turns){
 		}
 		if (nb_turn>=1){
 			leftSpeed= 0.45*MOTOR_SPEED_LIMIT;
-			rightSpeed =0.5*MOTOR_SPEED_LIMIT-0.5*get_calibrated_prox(IR8)- 0.25*get_calibrated_prox(IR7);
+			rightSpeed =0.5*MOTOR_SPEED_LIMIT-1*get_calibrated_prox(IR8)- 0.25*get_calibrated_prox(IR7);
 			if((nb_turn==1)&&(!debut)){
 				debut=left_motor_get_pos();
 			}
 			if((nb_turn==2)&&(debut)&&(!fin)){
 				fin=left_motor_get_pos();
-				dimension=fin-debut;
+				position_to_reach=0.5*(fin-debut);
 			}
 			if((nb_turn==max_turns)){
 				if(!reset_position){
 					left_motor_set_pos(0);
 					right_motor_set_pos(0);
 					reset_position=true;
-				}else if((reset_position)&&(left_motor_get_pos()>(0.5*dimension))){
-					leftSpeed= 0.5*MOTOR_SPEED_LIMIT-0.4*get_calibrated_prox(IR4);
-					rightSpeed =0.5*MOTOR_SPEED_LIMIT-1.2*get_calibrated_prox(IR6) - 0.4*get_calibrated_prox(IR5);
-					if((get_calibrated_prox(IR4)>(get_calibrated_prox(IR5)-100))&&(get_calibrated_prox(IR4)<(get_calibrated_prox(IR5)+100))&&(get_calibrated_prox(IR4)>600)){
+				}else if((reset_position)&&(left_motor_get_pos()>(position_to_reach))){
+					leftSpeed= 0.5*MOTOR_SPEED_LIMIT;
+					rightSpeed =-0.5*MOTOR_SPEED_LIMIT;
+
+					if((left_motor_get_pos()>=(position_to_reach+POSITION_ROTATION_90))){
 						done=1;
 						nb_turn=0,debut=0,fin=0,turningleft=false,reset_position=false;
 					}
 				}
 			}
-
+			//&&(get_calibrated_prox(IR4)>800)
 		}
 	}
 }
@@ -144,6 +154,7 @@ bool find_a_place(void){
 		set_led(LED5,0);
 	}
 	if(empty_space_dimension>=PLACE_DIM_MIN){
+		//to_computer_dim=empty_space_dimension;
 		empty_space_dimension=-1;
 		return true;
 	}else{
@@ -185,7 +196,6 @@ void park(void){
 void send_to_computer(TO_DO instruction){
 	static uint8_t mustSend = 0;
 	if(mustSend > 8){
-	//chprintf((BaseSequentialStream *)&SD3, "place dimension= %d \r\n",empty_space_dimension);
 	chprintf((BaseSequentialStream *)&SD3, "INSTRUCTION= %d,distance= %d \r\n",instruction,VL53L0X_get_dist_mm());
 	chprintf((BaseSequentialStream *)&SD3, "speed\r\n");
 	chprintf((BaseSequentialStream *)&SD3, "%4d,%4d,\r\n\n",leftSpeed,rightSpeed);
@@ -215,7 +225,7 @@ static THD_FUNCTION(Movement, arg) {
     	time = chVTGetSystemTime();
 
     	if (done) {
-    		if ( obstacle_detected(OBS_DIST_35cm) && (get_next_instruction()== PARK) ){
+    		if ( obstacle_detected(OBS_DIST_38cm) && (get_next_instruction()== PARK) ){
     				instruction=PARK;
     				done=false;
     		}else if (obstacle_detected(OBS_DIST_15cm)){
@@ -258,6 +268,7 @@ static THD_FUNCTION(Movement, arg) {
     	if (parkdone){
     		leftSpeed=0;
     		rightSpeed=0;
+    		//chprintf((BaseSequentialStream *)&SD3, "place dimension= %d \r\n",to_computer_dim);
     	}
 
     	left_motor_set_speed(leftSpeed);
