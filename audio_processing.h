@@ -17,12 +17,15 @@ typedef enum{
 	TURN_LEFT,
 	RONDPOINT,
 	PARK,
-	STOP
+	GO_BACK
 } TO_DO;
+
 
 void processAudioData(int16_t *data, uint16_t num_samples);
 
 void wait_start_signal(void);
+
+void wait_go_back_signal(void);
 
 /*
 *	Returns the pointer to the BUFFER_NAME_t buffer asked
