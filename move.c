@@ -11,17 +11,19 @@
 #include <move.h>
 #include <audio_processing.h>
 
-#define PI                  	3.1415926536f
-#define WHEEL_DISTANCE      	5.3f   					//cm
-#define PERIMETER_EPUCK     	(PI * WHEEL_DISTANCE)
-#define NSTEP_ONE_TURN      	1000 						// number of step for 1 turn of the motor
-#define WHEEL_PERIMETER			13 							// cm
+#define PI                  		3.1415926536f
+#define WHEEL_DISTANCE      		5.25f   					//cm
+#define PERIMETER_EPUCK     		(PI * WHEEL_DISTANCE)
+#define NSTEP_ONE_TURN      		1000 					// number of step for 1 turn of the motor
+#define WHEEL_PERIMETER			13 						// cm
 #define POSITION_ROTATION_90 	(0.25*PERIMETER_EPUCK) * NSTEP_ONE_TURN / WHEEL_PERIMETER
 
-#define DEFAULT_SPEED			0.7 * MOTOR_SPEED_LIMIT 	// step/s
+#define DEFAULT_SPEED			0.6 * MOTOR_SPEED_LIMIT 	// step/s
 #define OBS_DIST_15cm			150 						// mm
-#define OBS_DIST_38cm			380							// mm
-#define PLACE_DIM_MIN 			450 						// step
+#define OBS_DIST_38cm			380						// mm
+#define THRESHOLD_15cm			20
+#define THRESHOLD_38cm			80
+#define PLACE_DIM_MIN 			600 						// step
 #define nb_tour_aller			3
 #define nb_tour_retour			1
 
@@ -32,9 +34,9 @@ static int32_t to_computer_dim=0;
 
 
 //returns true if an obstacle is obs_dist mm away
-bool obstacle_detected(int16_t obs_dist){
-	return (VL53L0X_get_dist_mm()>=(obs_dist-20))
-			&& (VL53L0X_get_dist_mm()<=(obs_dist+20));
+bool obstacle_detected(int16_t obs_dist,uint8_t threshold ){
+	return (VL53L0X_get_dist_mm()>=(obs_dist-threshold))
+			&& (VL53L0X_get_dist_mm()<=(obs_dist+threshold));
 }
 
 bool end_left_wall(void){
@@ -42,7 +44,7 @@ bool end_left_wall(void){
 	if (get_calibrated_prox(IR6)>500){
 		walldetected=true;
 	}
-	if	((walldetected)&&(get_calibrated_prox(IR6)<150)&&(get_calibrated_prox(IR7)<15)){
+	if	((walldetected)&&(get_calibrated_prox(IR6)<200)){
 		walldetected=false;
 		return true;
 	}else{
@@ -56,7 +58,7 @@ bool end_right_wall(void){
 	if (get_calibrated_prox(IR3)>500){
 		walldetected=true;
 	}
-	if	((walldetected)&&(get_calibrated_prox(IR3)<150)&&(get_calibrated_prox(IR2)<15)){
+	if	((walldetected)&&(get_calibrated_prox(IR3)<200)){
 		walldetected=false;
 		return true;
 	}else{
@@ -68,7 +70,7 @@ bool end_right_wall(void){
 
 void rotate_right(void){
 
-	leftSpeed=0.45*MOTOR_SPEED_LIMIT;
+	leftSpeed=0.48*MOTOR_SPEED_LIMIT;
 	rightSpeed =0.5*MOTOR_SPEED_LIMIT - 1*get_calibrated_prox(IR8) - 0.5*get_calibrated_prox(IR7);
 
 	if (end_left_wall()){
@@ -80,7 +82,7 @@ void rotate_right(void){
 void rotate_left(void){
 
 	leftSpeed=0.5*MOTOR_SPEED_LIMIT- 1*get_calibrated_prox(IR1) - 0.5*get_calibrated_prox(IR2);
-	rightSpeed =0.45*MOTOR_SPEED_LIMIT;
+	rightSpeed =0.48*MOTOR_SPEED_LIMIT;
 
 	if (end_right_wall()){
 			done=true;
@@ -94,7 +96,7 @@ void rond_point(uint8_t max_turns){
 	static int32_t debut=0 ,fin=0,position_to_reach=1000;
 	if(nb_turn==0){
 		leftSpeed= 0.45*MOTOR_SPEED_LIMIT;
-		rightSpeed =0.5*MOTOR_SPEED_LIMIT-1*get_calibrated_prox(IR8) - 0.5*get_calibrated_prox(IR7);
+		rightSpeed =0.5*MOTOR_SPEED_LIMIT-0.5*get_calibrated_prox(IR8) - 0.25*get_calibrated_prox(IR7);
 	}
 
 	if(turningleft){
@@ -111,7 +113,7 @@ void rond_point(uint8_t max_turns){
 		}
 		if (nb_turn>=1){
 			leftSpeed= 0.45*MOTOR_SPEED_LIMIT;
-			rightSpeed =0.5*MOTOR_SPEED_LIMIT-1*get_calibrated_prox(IR8)- 0.25*get_calibrated_prox(IR7);
+			rightSpeed =0.5*MOTOR_SPEED_LIMIT-0.5*get_calibrated_prox(IR8)- 0.25*get_calibrated_prox(IR7);
 			if((nb_turn==1)&&(!debut)){
 				debut=left_motor_get_pos();
 			}
@@ -134,27 +136,27 @@ void rond_point(uint8_t max_turns){
 					}
 				}
 			}
-			//&&(get_calibrated_prox(IR4)>800)
+
 		}
 	}
 }
 
 bool find_a_place(void){
 	static int32_t debut=0 , fin=0, empty_space_dimension=-1;
-	leftSpeed=0.5*MOTOR_SPEED_LIMIT-0.5*get_calibrated_prox(IR1)- 0.25*get_calibrated_prox(IR2);
-	rightSpeed =0.45*MOTOR_SPEED_LIMIT;
+	leftSpeed=0.5*MOTOR_SPEED_LIMIT-0.5*get_calibrated_prox(IR1)- 0.5*get_calibrated_prox(IR2);
+	rightSpeed =0.43*MOTOR_SPEED_LIMIT;
 	if (end_right_wall()&&(!debut)){
 		debut=left_motor_get_pos();
 		set_led(LED5,1);
 	}
-	if(debut && (!fin) && (get_calibrated_prox(IR3)>500)){
+	if(debut && (!fin) && (get_calibrated_prox(IR3)>450)){
 		fin=left_motor_get_pos();
 		empty_space_dimension=fin-debut;
 		debut=0,fin=0;
 		set_led(LED5,0);
 	}
 	if(empty_space_dimension>=PLACE_DIM_MIN){
-		//to_computer_dim=empty_space_dimension;
+		to_computer_dim=empty_space_dimension;
 		empty_space_dimension=-1;
 		return true;
 	}else{
@@ -178,7 +180,7 @@ void park(void){
 		}else if(!tourne_marche_arriere){
 			leftSpeed=-0.5*MOTOR_SPEED_LIMIT+5*get_calibrated_prox(IR4);
 			rightSpeed =-0.5*MOTOR_SPEED_LIMIT+0.25*get_calibrated_prox(IR2);
-			if( (get_calibrated_prox(IR4)<15)&&(get_calibrated_prox(IR2)>150) ){
+			if( (get_calibrated_prox(IR4)<30)&&(get_calibrated_prox(IR5)<30)&&(get_calibrated_prox(IR2)>200) ){
 				tourne_marche_arriere=true;
 				place_found=false;
 				parkdone=true;
@@ -225,10 +227,10 @@ static THD_FUNCTION(Movement, arg) {
     	time = chVTGetSystemTime();
 
     	if (done) {
-    		if ( obstacle_detected(OBS_DIST_38cm) && (get_next_instruction()== PARK) ){
+    		if ( obstacle_detected(OBS_DIST_38cm,THRESHOLD_38cm) && (get_next_instruction()== PARK) ){
     				instruction=PARK;
     				done=false;
-    		}else if (obstacle_detected(OBS_DIST_15cm)){
+    		}else if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
     			instruction=get_next_instruction();
     			done=false;
     		}else{
@@ -253,12 +255,12 @@ static THD_FUNCTION(Movement, arg) {
 					park();
 					break;
 				case STOP:
-					left_motor_set_speed(0);
-					right_motor_set_speed(0);
+					//left_motor_set_speed(0);
+					//right_motor_set_speed(0);
 					break;
 				default:
-					left_motor_set_speed(0);
-					right_motor_set_speed(0);
+					//left_motor_set_speed(0);
+					//right_motor_set_speed(0);
 					break;
 			}
 		}
@@ -268,7 +270,7 @@ static THD_FUNCTION(Movement, arg) {
     	if (parkdone){
     		leftSpeed=0;
     		rightSpeed=0;
-    		//chprintf((BaseSequentialStream *)&SD3, "place dimension= %d \r\n",to_computer_dim);
+    		chprintf((BaseSequentialStream *)&SD3, "place dimension= %d \r\n",to_computer_dim);
     	}
 
     	left_motor_set_speed(leftSpeed);
