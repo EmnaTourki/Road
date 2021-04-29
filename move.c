@@ -158,7 +158,7 @@ void rond_point(uint8_t max_turns){
 bool find_a_place(void){
 	static int32_t debut=0 , fin=0, empty_space_dimension=-1;
 	leftSpeed=0.5*MOTOR_SPEED_LIMIT-0.5*get_calibrated_prox(IR1)- 0.5*get_calibrated_prox(IR2);
-	rightSpeed =0.43*MOTOR_SPEED_LIMIT;
+	rightSpeed =0.4*MOTOR_SPEED_LIMIT;
 	if (end_right_wall()&&(!debut)){
 		debut=left_motor_get_pos();
 		set_led(LED5,1);
@@ -182,6 +182,7 @@ bool find_a_place(void){
 void sortie_park(void){
 	chprintf((BaseSequentialStream *)&SD3, "sortie park\r\n");
 	done=true;
+
 }
 
 void park(void){
@@ -323,10 +324,11 @@ static THD_FUNCTION(Movement, arg) {
 
     	if (parkdone){
     		wayback=true;
-    		done=true;
     		chprintf((BaseSequentialStream *)&SD3, "place dimension= %d \r\n",to_computer_dim);
     		parkdone=false;
-    		wait_go_back_signal();
+    		chThdSleepMilliseconds(5000);
+		nb_instruction--;
+
     	}
 
 

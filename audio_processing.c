@@ -12,8 +12,6 @@
 
 //semaphore
 static BSEMAPHORE_DECL(start_sem, TRUE);
-static BSEMAPHORE_DECL(goback_sem, TRUE);
-
 //2 times FFT_SIZE because these arrays contain complex numbers (real + imaginary)
 static float micLeft_cmplx_input[2 * FFT_SIZE];
 
@@ -22,18 +20,17 @@ static float micLeft_output[FFT_SIZE];
 
 #define MIN_VALUE_THRESHOLD	10000
 
-#define MIN_FREQ		10	//we don't analyze before this index to not use resources for nothing
+#define MIN_FREQ			10	//we don't analyze before this index to not use resources for nothing
 #define FREQ_START		16	//250Hz
 #define FREQ_RIGHT		19	//296Hz
 #define FREQ_LEFT		23	//359HZ
 #define FREQ_RONDPOINT	26	//406Hz
 #define FREQ_PARK		29	//453Hz
-#define FREQ_GO_BACK	32	//500Hz
-#define MAX_FREQ		35	//we don't analyze after this index to not use resources for nothing
+#define MAX_FREQ			32	//we don't analyze after this index to not use resources for nothing
 
 
 static TO_DO next;
-static float max_norm;// à enlever !!
+static float max_norm;// ï¿½ enlever !!
 
 
 
@@ -84,11 +81,6 @@ void sound_remote(float* data){
 	//park
 	else if(max_norm_index >= (FREQ_PARK-1) && max_norm_index <= (FREQ_PARK+1)){
 		next=PARK;
-	}
-	//go back to the starting point
-	else if(max_norm_index >= (FREQ_GO_BACK-1) && max_norm_index <= (FREQ_GO_BACK+1)){
-		next=GO_BACK;
-		chBSemSignal(&goback_sem);
 	}
 	else{
 		next=ancien;
@@ -162,10 +154,6 @@ void processAudioData(int16_t *data, uint16_t num_samples){
 
 void wait_start_signal(void){
 	chBSemWait(&start_sem);
-}
-
-void wait_go_back_signal(void){
-	chBSemWait(&goback_sem);
 }
 
 float* get_audio_buffer_ptr(BUFFER_NAME_t name){
