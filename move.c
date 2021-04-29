@@ -181,6 +181,7 @@ bool find_a_place(void){
 
 void sortie_park(void){
 	chprintf((BaseSequentialStream *)&SD3, "sortie park\r\n");
+	done=true;
 }
 
 void park(void){
