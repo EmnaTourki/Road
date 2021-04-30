@@ -20,17 +20,17 @@ static float micLeft_output[FFT_SIZE];
 
 #define MIN_VALUE_THRESHOLD	10000
 
-#define MIN_FREQ			10	//we don't analyze before this index to not use resources for nothing
+#define MIN_FREQ		10	//we don't analyze before this index to not use resources for nothing
 #define FREQ_START		16	//250Hz
 #define FREQ_RIGHT		19	//296Hz
 #define FREQ_LEFT		23	//359HZ
 #define FREQ_RONDPOINT	26	//406Hz
 #define FREQ_PARK		29	//453Hz
-#define MAX_FREQ			32	//we don't analyze after this index to not use resources for nothing
+#define MAX_FREQ		32	//we don't analyze after this index to not use resources for nothing
 
 
 static TO_DO next;
-static float max_norm;// ï¿½ enlever !!
+static float max_norm;// à enlever !!
 
 
 

@@ -17,13 +17,13 @@
 #define NSTEP_ONE_TURN      	1000 						// number of step for 1 turn of the motor
 #define WHEEL_PERIMETER			13 							// cm
 #define POSITION_ROTATION_90 	(0.25*PERIMETER_EPUCK) * NSTEP_ONE_TURN / WHEEL_PERIMETER
-
+#define CORRECTION_ROTATION_90 	0.97
 #define DEFAULT_SPEED			0.6 * MOTOR_SPEED_LIMIT 	// step/s
 #define OBS_DIST_15cm			150 						// mm
 #define OBS_DIST_38cm			380							// mm
 #define THRESHOLD_15cm			20
 #define THRESHOLD_38cm			80
-#define PLACE_DIM_MIN 			600 						// step
+#define PLACE_DIM_MIN 			500 						// step eya 600
 #define NB_TOUR_ALLER			3
 #define NB_TOUR_RETOUR			1
 #define MAX_NB_INSTRUCTION		20
@@ -52,6 +52,7 @@ bool obstacle_detected(int16_t obs_dist,uint8_t threshold ){
 	return (VL53L0X_get_dist_mm()>=(obs_dist-threshold))
 			&& (VL53L0X_get_dist_mm()<=(obs_dist+threshold));
 }
+
 
 bool end_left_wall(void){
 	static bool walldetected=0;
@@ -94,7 +95,6 @@ void rotate_right(void){
 }
 
 void rotate_left(void){
-
 	leftSpeed=0.5*MOTOR_SPEED_LIMIT- 1*get_calibrated_prox(IR1) - 0.5*get_calibrated_prox(IR2);
 	rightSpeed =0.48*MOTOR_SPEED_LIMIT;
 
@@ -104,9 +104,27 @@ void rotate_left(void){
 
 }
 
+void sortie_rondpoint(int32_t position_to_reach){
+	static bool reset_position=0;
+
+	if(!reset_position){
+		left_motor_set_pos(0);
+		right_motor_set_pos(0);
+		reset_position=true;
+	}else if((reset_position)&&(left_motor_get_pos()>(position_to_reach))){
+		leftSpeed= 0.5*MOTOR_SPEED_LIMIT;
+		rightSpeed =-0.5*MOTOR_SPEED_LIMIT;
+
+		if((left_motor_get_pos()>=(position_to_reach+POSITION_ROTATION_90))){
+			done=1;
+			reset_position=false;
+		}
+	}
+}
+
 void rond_point(uint8_t max_turns){
 	static uint8_t nb_turn=0;
-	static bool turningleft=0,reset_position=0;
+	static bool turningleft=0;
 	static int32_t debut=0 ,fin=0,position_to_reach=1000;
 	if(nb_turn==0){
 		leftSpeed= 0.45*MOTOR_SPEED_LIMIT;
@@ -136,18 +154,9 @@ void rond_point(uint8_t max_turns){
 				position_to_reach=0.5*(fin-debut);
 			}
 			if((nb_turn==max_turns)){
-				if(!reset_position){
-					left_motor_set_pos(0);
-					right_motor_set_pos(0);
-					reset_position=true;
-				}else if((reset_position)&&(left_motor_get_pos()>(position_to_reach))){
-					leftSpeed= 0.5*MOTOR_SPEED_LIMIT;
-					rightSpeed =-0.5*MOTOR_SPEED_LIMIT;
-
-					if((left_motor_get_pos()>=(position_to_reach+POSITION_ROTATION_90))){
-						done=1;
-						nb_turn=0,debut=0,fin=0,turningleft=false,reset_position=false;
-					}
+				sortie_rondpoint(position_to_reach);
+				if (done){
+					nb_turn=0,debut=0,fin=0,turningleft=false;
 				}
 			}
 
@@ -180,8 +189,23 @@ bool find_a_place(void){
 }
 
 void sortie_park(void){
-	chprintf((BaseSequentialStream *)&SD3, "sortie park\r\n");
-	done=true;
+	static bool tourne=false;
+	if(!tourne){
+		leftSpeed= 0.5*MOTOR_SPEED_LIMIT;
+		rightSpeed= 0.5*MOTOR_SPEED_LIMIT;
+		if ( (get_calibrated_prox(IR3)<15)&&(get_calibrated_prox(IR6)<15)&&(get_calibrated_prox(IR4)<15)&&(get_calibrated_prox(IR5)<15)){
+				tourne=true;
+				left_motor_set_pos(0);
+				right_motor_set_pos(0);
+			}
+	}else if(tourne){
+		leftSpeed=-0.5*MOTOR_SPEED_LIMIT;
+		rightSpeed=0.5*MOTOR_SPEED_LIMIT;
+		if(right_motor_get_pos()>=(CORRECTION_ROTATION_90*POSITION_ROTATION_90)){
+			tourne=false;
+			done=true;
+		}
+	}
 
 }
 
@@ -219,6 +243,7 @@ void park(void){
 void send_to_computer(TO_DO instruction){
 	static uint8_t mustSend = 0;
 	if(mustSend > 8){
+	chprintf((BaseSequentialStream *)&SD3, "place dimension= %d \r\n",to_computer_dim);
 	chprintf((BaseSequentialStream *)&SD3, "INSTRUCTION= %d,distance= %d \r\n",instruction,VL53L0X_get_dist_mm());
 	chprintf((BaseSequentialStream *)&SD3, "speed\r\n");
 	chprintf((BaseSequentialStream *)&SD3, "%4d,%4d,\r\n\n",leftSpeed,rightSpeed);
@@ -249,40 +274,40 @@ static THD_FUNCTION(Movement, arg) {
 	calibrate_ir();
 
     while(1){
-    	time = chVTGetSystemTime();
+		time = chVTGetSystemTime();
 
-    	if(!wayback){
-    		if (done) {
-    		    		if ( obstacle_detected(OBS_DIST_38cm,THRESHOLD_38cm) && (get_next_instruction()== PARK) ){
-    		    				instruction=PARK;
-    		    				instruction_tab[nb_instruction]=instruction;
-    		    				done=false;
-    		    		}else if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
-    		    			instruction=get_next_instruction();
-    		    			instruction_tab[nb_instruction]=instruction;
-    		    			nb_instruction++;
-    		    			done=false;
-    		    		}else{
-    		    			leftSpeed=DEFAULT_SPEED;
-    		    			rightSpeed=DEFAULT_SPEED;
-    		    		}
-    		    	}
-    	}else if(wayback){
-    		if (done) {
-    			if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
-    				instruction=wayback_instruction(instruction_tab[nb_instruction]);
-    				nb_instruction--;
-    				done=false;
-    			}else if(nb_instruction == -1){
-    				//THE END
-    				leftSpeed=0;
-    				rightSpeed=0;
-    			}else{
+		if(!wayback){
+			if (done) {
+				if ( obstacle_detected(OBS_DIST_38cm,THRESHOLD_38cm) && (get_next_instruction()== PARK) ){
+						instruction=PARK;
+						instruction_tab[nb_instruction]=instruction;
+						done=false;
+				}else if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
+					instruction=get_next_instruction();
+					instruction_tab[nb_instruction]=instruction;
+					nb_instruction++;
+					done=false;
+				}else{
 					leftSpeed=DEFAULT_SPEED;
 					rightSpeed=DEFAULT_SPEED;
-    			}
-    		}
-    	}
+				}
+					}
+		}else if(wayback){
+			if (done) {
+				if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
+					instruction=wayback_instruction(instruction_tab[nb_instruction]);
+					nb_instruction--;
+					done=false;
+				}else if(nb_instruction == -1){
+					//THE END
+					leftSpeed=0;
+					rightSpeed=0;
+				}else{
+					leftSpeed=DEFAULT_SPEED;
+					rightSpeed=DEFAULT_SPEED;
+				}
+			}
+		}
 
 
 		if (!done){
@@ -317,24 +342,23 @@ static THD_FUNCTION(Movement, arg) {
 			}
 		}
 
-    	send_to_computer(instruction);
+		send_to_computer(instruction);
 
-    	left_motor_set_speed(leftSpeed);
-    	right_motor_set_speed(rightSpeed);
+		left_motor_set_speed(leftSpeed);
+		right_motor_set_speed(rightSpeed);
 
-    	if (parkdone){
-    		wayback=true;
-    		chprintf((BaseSequentialStream *)&SD3, "place dimension= %d \r\n",to_computer_dim);
-    		parkdone=false;
-    		chThdSleepMilliseconds(5000);
-		nb_instruction--;
+		if (parkdone){
+			wayback=true;
+			parkdone=false;
+			chThdSleepMilliseconds(5000);
+			nb_instruction--;
 
-    	}
-
+		}
 
 
-    	chThdSleepUntilWindowed(time, time + MS2ST(10)); // Refresh @ 100 Hz
-    }
+
+		chThdSleepUntilWindowed(time, time + MS2ST(10)); // Refresh @ 100 Hz
+	}
  }
 
 void movement_start(void){
