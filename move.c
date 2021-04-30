@@ -23,7 +23,7 @@
 #define OBS_DIST_38cm			380							// mm
 #define THRESHOLD_15cm			20
 #define THRESHOLD_38cm			80
-#define PLACE_DIM_MIN 			500 						// step eya 600
+#define PLACE_DIM_MIN 			600 						// step
 #define NB_TOUR_ALLER			3
 #define NB_TOUR_RETOUR			1
 #define MAX_NB_INSTRUCTION		20
@@ -82,9 +82,19 @@ bool end_right_wall(void){
 
 }
 
+void clignotant(rgb_led_name_t led_1,rgb_led_name_t led_2){
+	static uint8_t counter=0;
+	if(counter>10){
+		toggle_rgb_led(led_1, GREEN_LED, 255);
+		toggle_rgb_led(led_2, GREEN_LED, 255);
+		counter=0;
+	}
+	counter++;
+}
+
 
 void rotate_right(void){
-
+	clignotant(LED2,LED4);
 	leftSpeed=0.48*MOTOR_SPEED_LIMIT;
 	rightSpeed =0.5*MOTOR_SPEED_LIMIT - 1*get_calibrated_prox(IR8) - 0.5*get_calibrated_prox(IR7);
 
@@ -95,6 +105,7 @@ void rotate_right(void){
 }
 
 void rotate_left(void){
+	clignotant(LED8,LED6);
 	leftSpeed=0.5*MOTOR_SPEED_LIMIT- 1*get_calibrated_prox(IR1) - 0.5*get_calibrated_prox(IR2);
 	rightSpeed =0.48*MOTOR_SPEED_LIMIT;
 
@@ -106,6 +117,8 @@ void rotate_left(void){
 
 void sortie_rondpoint(int32_t position_to_reach){
 	static bool reset_position=0;
+
+	clignotant(LED2,LED4);
 
 	if(!reset_position){
 		left_motor_set_pos(0);
@@ -190,6 +203,9 @@ bool find_a_place(void){
 
 void sortie_park(void){
 	static bool tourne=false;
+
+	clignotant(LED8,LED6);
+
 	if(!tourne){
 		leftSpeed= 0.5*MOTOR_SPEED_LIMIT;
 		rightSpeed= 0.5*MOTOR_SPEED_LIMIT;
@@ -278,6 +294,7 @@ static THD_FUNCTION(Movement, arg) {
 
 		if(!wayback){
 			if (done) {
+				clear_leds();
 				if ( obstacle_detected(OBS_DIST_38cm,THRESHOLD_38cm) && (get_next_instruction()== PARK) ){
 						instruction=PARK;
 						instruction_tab[nb_instruction]=instruction;
@@ -294,6 +311,7 @@ static THD_FUNCTION(Movement, arg) {
 					}
 		}else if(wayback){
 			if (done) {
+				clear_leds();
 				if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
 					instruction=wayback_instruction(instruction_tab[nb_instruction]);
 					nb_instruction--;
@@ -350,6 +368,7 @@ static THD_FUNCTION(Movement, arg) {
 		if (parkdone){
 			wayback=true;
 			parkdone=false;
+			clear_leds();
 			chThdSleepMilliseconds(5000);
 			nb_instruction--;
 

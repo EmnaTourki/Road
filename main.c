@@ -13,6 +13,7 @@
 #include <audio/microphone.h>
 #include <sensors/VL53L0X/VL53L0X.h>
 #include <sensors/proximity.h>
+#include <spi_comm.h>
 
 #include <audio_processing.h>
 #include <move.h>
@@ -55,7 +56,8 @@ int main(void)
     VL53L0X_start();
     // Starts the proximity measurement module
     proximity_start();
-
+    //starts LED
+    spi_comm_start();
     //starts the microphones processing thread.
     //it calls the callback given in parameter when samples are ready
     mic_start(&processAudioData);
