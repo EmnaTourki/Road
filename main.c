@@ -14,6 +14,9 @@
 #include <sensors/VL53L0X/VL53L0X.h>
 #include <sensors/proximity.h>
 #include <spi_comm.h>
+#include "audio/audio_thread.h"
+#include <audio/play_melody.h>
+
 
 #include <audio_processing.h>
 #include <move.h>
@@ -58,6 +61,8 @@ int main(void)
     proximity_start();
     //starts LED
     spi_comm_start();
+    // start melody thread
+    //playMelodyStart();
     //starts the microphones processing thread.
     //it calls the callback given in parameter when samples are ready
     mic_start(&processAudioData);

@@ -10,6 +10,9 @@
 #include <sensors/proximity.h>
 #include <move.h>
 #include <audio_processing.h>
+#include "audio/audio_thread.h"
+#include <audio/play_melody.h>
+
 
 #define PI                  	3.1415926536f
 #define WHEEL_DISTANCE      	5.30f   					//cm
@@ -318,6 +321,7 @@ static THD_FUNCTION(Movement, arg) {
 					done=false;
 				}else if(nb_instruction == -1){
 					//THE END
+					//stopCurrentMelody();
 					leftSpeed=0;
 					rightSpeed=0;
 				}else{
@@ -369,6 +373,7 @@ static THD_FUNCTION(Movement, arg) {
 			wayback=true;
 			parkdone=false;
 			clear_leds();
+			//playMelody(SEVEN_NATION_ARMY, ML_SIMPLE_PLAY, NULL);
 			chThdSleepMilliseconds(5000);
 			nb_instruction--;
 
