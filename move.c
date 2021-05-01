@@ -12,18 +12,18 @@
 #include <audio_processing.h>
 
 #define PI                  	3.1415926536f
-#define WHEEL_DISTANCE      	5.25f   					//cm
+#define WHEEL_DISTANCE      	5.30f   					//cm
 #define PERIMETER_EPUCK     	(PI * WHEEL_DISTANCE)
 #define NSTEP_ONE_TURN      	1000 						// number of step for 1 turn of the motor
 #define WHEEL_PERIMETER			13 							// cm
 #define POSITION_ROTATION_90 	(0.25*PERIMETER_EPUCK) * NSTEP_ONE_TURN / WHEEL_PERIMETER
-#define CORRECTION_ROTATION_90 	0.97
+#define CORRECTION_ROTATION_90 	1
 #define DEFAULT_SPEED			0.6 * MOTOR_SPEED_LIMIT 	// step/s
-#define OBS_DIST_15cm			150 						// mm
+#define OBS_DIST_15cm			130 						// mm
 #define OBS_DIST_38cm			380							// mm
 #define THRESHOLD_15cm			20
 #define THRESHOLD_38cm			80
-#define PLACE_DIM_MIN 			600 						// step
+#define PLACE_DIM_MIN 			500 						// step
 #define NB_TOUR_ALLER			3
 #define NB_TOUR_RETOUR			1
 #define MAX_NB_INSTRUCTION		20
@@ -141,7 +141,7 @@ void rond_point(uint8_t max_turns){
 	static int32_t debut=0 ,fin=0,position_to_reach=1000;
 	if(nb_turn==0){
 		leftSpeed= 0.45*MOTOR_SPEED_LIMIT;
-		rightSpeed =0.5*MOTOR_SPEED_LIMIT-0.5*get_calibrated_prox(IR8) - 0.25*get_calibrated_prox(IR7);
+		rightSpeed =0.5*MOTOR_SPEED_LIMIT-0.7*get_calibrated_prox(IR8) - 0.25*get_calibrated_prox(IR7);
 	}
 
 	if(turningleft){
@@ -207,9 +207,9 @@ void sortie_park(void){
 	clignotant(LED8,LED6);
 
 	if(!tourne){
-		leftSpeed= 0.5*MOTOR_SPEED_LIMIT;
-		rightSpeed= 0.5*MOTOR_SPEED_LIMIT;
-		if ( (get_calibrated_prox(IR3)<15)&&(get_calibrated_prox(IR6)<15)&&(get_calibrated_prox(IR4)<15)&&(get_calibrated_prox(IR5)<15)){
+		leftSpeed= 0.5*MOTOR_SPEED_LIMIT-0.25*get_calibrated_prox(IR2);
+		rightSpeed= 0.5*MOTOR_SPEED_LIMIT-0.25*get_calibrated_prox(IR4);
+		if ( (get_calibrated_prox(IR3)<30)&&(get_calibrated_prox(IR6)<30)&&(get_calibrated_prox(IR4)<30)&&(get_calibrated_prox(IR5)<30)){
 				tourne=true;
 				left_motor_set_pos(0);
 				right_motor_set_pos(0);
