@@ -14,7 +14,7 @@
 #include <sensors/VL53L0X/VL53L0X.h>
 #include <sensors/proximity.h>
 #include <spi_comm.h>
-#include "audio/audio_thread.h"
+#include <audio/audio_thread.h>
 #include <audio/play_melody.h>
 
 
@@ -59,13 +59,14 @@ int main(void)
     VL53L0X_start();
     // Starts the proximity measurement module
     proximity_start();
-    //starts LED
+    //starts SPI communication thread.
     spi_comm_start();
-    // start melody thread
-    //playMelodyStart();
     //starts the microphones processing thread.
     //it calls the callback given in parameter when samples are ready
     mic_start(&processAudioData);
+    //start melody thread and the DAC module.
+    dac_start();
+    playMelodyStart();
     //start the movement thread
     movement_start();
 

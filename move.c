@@ -10,16 +10,17 @@
 #include <sensors/proximity.h>
 #include <move.h>
 #include <audio_processing.h>
-#include "audio/audio_thread.h"
 #include <audio/play_melody.h>
+#include <audio/audio_thread.h>
+
 
 
 #define PI                  	3.1415926536f
 #define WHEEL_DISTANCE      	5.30f   					//cm
-#define PERIMETER_EPUCK     	(PI * WHEEL_DISTANCE)
+#define PERIMETER_EPUCK     	(PI * WHEEL_DISTANCE)		//cm
 #define NSTEP_ONE_TURN      	1000 						// number of step for 1 turn of the motor
 #define WHEEL_PERIMETER			13 							// cm
-#define POSITION_ROTATION_90 	(0.25*PERIMETER_EPUCK) * NSTEP_ONE_TURN / WHEEL_PERIMETER
+#define POSITION_ROTATION_90 	(0.25*PERIMETER_EPUCK) * NSTEP_ONE_TURN / WHEEL_PERIMETER //step
 #define CORRECTION_ROTATION_90 	1
 #define DEFAULT_SPEED			0.6 * MOTOR_SPEED_LIMIT 	// step/s
 #define OBS_DIST_15cm			130 						// mm
@@ -280,10 +281,10 @@ static THD_FUNCTION(Movement, arg) {
     (void)arg;
 
     systime_t time;
-    static TO_DO instruction=0;
-    static TO_DO instruction_tab[MAX_NB_INSTRUCTION];
-    static int8_t nb_instruction=0;
-    static bool wayback=0;
+    TO_DO instruction=0;
+    TO_DO instruction_tab[MAX_NB_INSTRUCTION]={0};
+    int8_t nb_instruction=0;
+    bool wayback=0;
     done=true;
     parkdone=false;
 
@@ -321,7 +322,7 @@ static THD_FUNCTION(Movement, arg) {
 					done=false;
 				}else if(nb_instruction == -1){
 					//THE END
-					//stopCurrentMelody();
+					stopCurrentMelody();
 					leftSpeed=0;
 					rightSpeed=0;
 				}else{
@@ -373,13 +374,10 @@ static THD_FUNCTION(Movement, arg) {
 			wayback=true;
 			parkdone=false;
 			clear_leds();
-			//playMelody(SEVEN_NATION_ARMY, ML_SIMPLE_PLAY, NULL);
 			chThdSleepMilliseconds(5000);
+			playMelody(IMPOSSIBLE_MISSION, ML_SIMPLE_PLAY, NULL);
 			nb_instruction--;
-
 		}
-
-
 
 		chThdSleepUntilWindowed(time, time + MS2ST(10)); // Refresh @ 100 Hz
 	}
