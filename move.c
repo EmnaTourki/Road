@@ -27,7 +27,7 @@
 #define OBS_DIST_38cm			380							// mm
 #define THRESHOLD_15cm			20
 #define THRESHOLD_38cm			80
-#define PLACE_DIM_MIN 			500 						// step
+#define PLACE_DIM_MIN 			400							// step
 #define NB_TOUR_ALLER			3
 #define NB_TOUR_RETOUR			1
 #define MAX_NB_INSTRUCTION		20
@@ -183,8 +183,8 @@ void rond_point(uint8_t max_turns){
 
 bool find_a_place(void){
 	static int32_t debut=0 , fin=0, empty_space_dimension=-1;
-	leftSpeed=0.5*MOTOR_SPEED_LIMIT-0.8*get_calibrated_prox(IR1)- 0.6*get_calibrated_prox(IR2);
-	rightSpeed =0.41*MOTOR_SPEED_LIMIT;
+	leftSpeed=0.5*MOTOR_SPEED_LIMIT-0.5*get_calibrated_prox(IR1)- 0.5*get_calibrated_prox(IR2);
+	rightSpeed =0.40*MOTOR_SPEED_LIMIT;
 	if (end_right_wall()&&(!debut)){
 		debut=left_motor_get_pos();
 		set_led(LED5,1);
