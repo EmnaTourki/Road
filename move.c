@@ -21,7 +21,7 @@
 #define NSTEP_ONE_TURN      	1000 						// number of step for 1 turn of the motor
 #define WHEEL_PERIMETER			13 							// cm
 #define POSITION_ROTATION_90 	(0.25*PERIMETER_EPUCK) * NSTEP_ONE_TURN / WHEEL_PERIMETER //step
-#define CORRECTION_ROTATION_90 	1
+#define CORRECTION_ROTATION_90 	0.98
 #define DEFAULT_SPEED			0.6 * MOTOR_SPEED_LIMIT 	// step/s
 #define OBS_DIST_15cm			130 						// mm
 #define OBS_DIST_38cm			380							// mm
@@ -99,8 +99,8 @@ void clignotant(rgb_led_name_t led_1,rgb_led_name_t led_2){
 
 void rotate_right(void){
 	clignotant(LED2,LED4);
-	leftSpeed=0.48*MOTOR_SPEED_LIMIT;
-	rightSpeed =0.5*MOTOR_SPEED_LIMIT - 1*get_calibrated_prox(IR8) - 0.5*get_calibrated_prox(IR7);
+	leftSpeed=0.5*MOTOR_SPEED_LIMIT;
+	rightSpeed =0.5*MOTOR_SPEED_LIMIT - 1.2*get_calibrated_prox(IR8) - 0.6*get_calibrated_prox(IR7);
 
 	if (end_left_wall()){
 		done=true;
@@ -110,8 +110,8 @@ void rotate_right(void){
 
 void rotate_left(void){
 	clignotant(LED8,LED6);
-	leftSpeed=0.5*MOTOR_SPEED_LIMIT- 1*get_calibrated_prox(IR1) - 0.5*get_calibrated_prox(IR2);
-	rightSpeed =0.48*MOTOR_SPEED_LIMIT;
+	leftSpeed=0.5*MOTOR_SPEED_LIMIT- 1.2*get_calibrated_prox(IR1) - 0.6*get_calibrated_prox(IR2);
+	rightSpeed =0.5*MOTOR_SPEED_LIMIT;
 
 	if (end_right_wall()){
 			done=true;
@@ -132,7 +132,7 @@ void sortie_rondpoint(int32_t position_to_reach){
 		leftSpeed= 0.5*MOTOR_SPEED_LIMIT;
 		rightSpeed =-0.5*MOTOR_SPEED_LIMIT;
 
-		if((left_motor_get_pos()>=(position_to_reach+POSITION_ROTATION_90))){
+		if((left_motor_get_pos()>=(position_to_reach+CORRECTION_ROTATION_90*POSITION_ROTATION_90))){
 			done=1;
 			reset_position=false;
 		}
@@ -183,8 +183,8 @@ void rond_point(uint8_t max_turns){
 
 bool find_a_place(void){
 	static int32_t debut=0 , fin=0, empty_space_dimension=-1;
-	leftSpeed=0.5*MOTOR_SPEED_LIMIT-0.5*get_calibrated_prox(IR1)- 0.5*get_calibrated_prox(IR2);
-	rightSpeed =0.4*MOTOR_SPEED_LIMIT;
+	leftSpeed=0.5*MOTOR_SPEED_LIMIT-0.8*get_calibrated_prox(IR1)- 0.6*get_calibrated_prox(IR2);
+	rightSpeed =0.41*MOTOR_SPEED_LIMIT;
 	if (end_right_wall()&&(!debut)){
 		debut=left_motor_get_pos();
 		set_led(LED5,1);
@@ -309,11 +309,12 @@ static THD_FUNCTION(Movement, arg) {
 					nb_instruction++;
 					done=false;
 				}else{
-					leftSpeed=DEFAULT_SPEED;
-					rightSpeed=DEFAULT_SPEED;
+					leftSpeed=DEFAULT_SPEED-1*get_calibrated_prox(IR1) - 0.5*get_calibrated_prox(IR2);
+					rightSpeed=DEFAULT_SPEED-1*get_calibrated_prox(IR8) - 0.5*get_calibrated_prox(IR7);
 				}
 					}
 		}else if(wayback){
+			playMelody(IMPOSSIBLE_MISSION, ML_SIMPLE_PLAY, NULL);
 			if (done) {
 				clear_leds();
 				if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
@@ -326,8 +327,8 @@ static THD_FUNCTION(Movement, arg) {
 					leftSpeed=0;
 					rightSpeed=0;
 				}else{
-					leftSpeed=DEFAULT_SPEED;
-					rightSpeed=DEFAULT_SPEED;
+					leftSpeed=DEFAULT_SPEED-1*get_calibrated_prox(IR1) - 0.5*get_calibrated_prox(IR2);
+					rightSpeed=DEFAULT_SPEED-1*get_calibrated_prox(IR8) - 0.5*get_calibrated_prox(IR7);
 				}
 			}
 		}
@@ -375,7 +376,6 @@ static THD_FUNCTION(Movement, arg) {
 			parkdone=false;
 			clear_leds();
 			chThdSleepMilliseconds(5000);
-			playMelody(IMPOSSIBLE_MISSION, ML_SIMPLE_PLAY, NULL);
 			nb_instruction--;
 		}
 
