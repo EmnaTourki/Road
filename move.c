@@ -27,7 +27,7 @@
 #define OBS_DIST_38cm			380							// mm
 #define THRESHOLD_15cm			20							// mm
 #define THRESHOLD_38cm			80							// mm
-#define PLACE_DIM_MIN 			400							// step
+#define PLACE_DIM_MIN 			450							// step
 #define MAX_NB_INSTRUCTION		20
 
 static int16_t leftSpeed = 0, rightSpeed = 0;
@@ -85,7 +85,7 @@ void clignotant(rgb_led_name_t led_1,rgb_led_name_t led_2){
 void rotate_right(void){
 	clignotant(LED2,LED4);
 	leftSpeed=0.5*MOTOR_SPEED_LIMIT;
-	rightSpeed =0.5*MOTOR_SPEED_LIMIT - 1.2*get_calibrated_prox(IR8) - 0.6*get_calibrated_prox(IR7);
+	rightSpeed =0.5*MOTOR_SPEED_LIMIT - 1.5*get_calibrated_prox(IR8) - 0.5*get_calibrated_prox(IR7);
 
 	if (end_left_wall()){
 		done=true;
@@ -95,7 +95,7 @@ void rotate_right(void){
 
 void rotate_left(void){
 	clignotant(LED8,LED6);
-	leftSpeed=0.5*MOTOR_SPEED_LIMIT- 1.2*get_calibrated_prox(IR1) - 0.6*get_calibrated_prox(IR2);
+	leftSpeed=0.5*MOTOR_SPEED_LIMIT- 1.5*get_calibrated_prox(IR1) - 0.5*get_calibrated_prox(IR2);
 	rightSpeed =0.5*MOTOR_SPEED_LIMIT;
 
 	if (end_right_wall()){
