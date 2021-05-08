@@ -25,30 +25,15 @@
 #define DEFAULT_SPEED			0.6 * MOTOR_SPEED_LIMIT 	// step/s
 #define OBS_DIST_15cm			130 						// mm
 #define OBS_DIST_38cm			380							// mm
-#define THRESHOLD_15cm			20
-#define THRESHOLD_38cm			80
+#define THRESHOLD_15cm			20							// mm
+#define THRESHOLD_38cm			80							// mm
 #define PLACE_DIM_MIN 			400							// step
-#define NB_TOUR_ALLER			3
-#define NB_TOUR_RETOUR			1
 #define MAX_NB_INSTRUCTION		20
 
 static int16_t leftSpeed = 0, rightSpeed = 0;
 static bool done=true;
 static bool parkdone=false;
 static int32_t to_computer_dim=0;
-
-
-TO_DO wayback_instruction(TO_DO instruction_aller){
-	if (instruction_aller==TURN_RIGHT){
-		return TURN_LEFT;
-	}
-	else if (instruction_aller==TURN_LEFT){
-		return TURN_RIGHT;
-	}else{
-		return instruction_aller;
-	}
-}
-
 
 
 //returns true if an obstacle is obs_dist mm away
@@ -139,7 +124,7 @@ void sortie_rondpoint(int32_t position_to_reach){
 	}
 }
 
-void rond_point(uint8_t max_turns){
+void rond_point(uint8_t exit){
 	static uint8_t nb_turn=0;
 	static bool turningleft=0;
 	static int32_t debut=0 ,fin=0,position_to_reach=1000;
@@ -147,17 +132,8 @@ void rond_point(uint8_t max_turns){
 		leftSpeed= 0.45*MOTOR_SPEED_LIMIT;
 		rightSpeed =0.5*MOTOR_SPEED_LIMIT-0.7*get_calibrated_prox(IR8) - 0.25*get_calibrated_prox(IR7);
 	}
-
-	if(turningleft){
-		leftSpeed=0.1*MOTOR_SPEED_LIMIT;
-		rightSpeed =0.5*MOTOR_SPEED_LIMIT;
-		if(get_calibrated_prox(IR7)>500){
-			turningleft=false;
-			nb_turn++;
-		}
-	}
-	else if( (!turningleft)){
-		if( end_left_wall() && (nb_turn!=max_turns)){
+	if( (!turningleft)){
+		if( end_left_wall() && (nb_turn!=exit)){
 			turningleft=true;
 		}
 		if (nb_turn>=1){
@@ -170,13 +146,21 @@ void rond_point(uint8_t max_turns){
 				fin=left_motor_get_pos();
 				position_to_reach=0.5*(fin-debut);
 			}
-			if((nb_turn==max_turns)){
+			if((nb_turn==exit)){
 				sortie_rondpoint(position_to_reach);
 				if (done){
 					nb_turn=0,debut=0,fin=0,turningleft=false;
 				}
 			}
 
+		}
+	}
+	else if(turningleft){
+		leftSpeed=0.1*MOTOR_SPEED_LIMIT;
+		rightSpeed =0.5*MOTOR_SPEED_LIMIT;
+		if(get_calibrated_prox(IR7)>500){
+			turningleft=false;
+			nb_turn++;
 		}
 	}
 }
@@ -283,7 +267,7 @@ static THD_FUNCTION(Movement, arg) {
     systime_t time;
     TO_DO instruction=0;
     TO_DO instruction_tab[MAX_NB_INSTRUCTION]={0};
-    int8_t nb_instruction=0;
+    int8_t nb_instruction=-1;
     bool wayback=0;
     done=true;
     parkdone=false;
@@ -301,12 +285,11 @@ static THD_FUNCTION(Movement, arg) {
 				clear_leds();
 				if ( obstacle_detected(OBS_DIST_38cm,THRESHOLD_38cm) && (get_next_instruction()== PARK) ){
 						instruction=PARK;
-						instruction_tab[nb_instruction]=instruction;
 						done=false;
 				}else if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
+					nb_instruction++;
 					instruction=get_next_instruction();
 					instruction_tab[nb_instruction]=instruction;
-					nb_instruction++;
 					done=false;
 				}else{
 					leftSpeed=DEFAULT_SPEED-1*get_calibrated_prox(IR1) - 0.5*get_calibrated_prox(IR2);
@@ -343,13 +326,8 @@ static THD_FUNCTION(Movement, arg) {
 				case TURN_LEFT:
 					rotate_left();
 					break;
-				case RONDPOINT:
-					if(!wayback){
-						rond_point(NB_TOUR_ALLER);
-					}else{
-						rond_point(NB_TOUR_RETOUR);
-					}
-
+				case RONDPOINT_EXIT1...RONDPOINT_EXIT4 :
+					rond_point(instruction);
 					break;
 				case PARK:
 					if(!wayback){
@@ -359,7 +337,7 @@ static THD_FUNCTION(Movement, arg) {
 					}
 					break;
 				default:
-					instruction=0;
+					instruction=ERREUR;
 					leftSpeed=0;
 					rightSpeed=0;
 					break;
@@ -376,7 +354,6 @@ static THD_FUNCTION(Movement, arg) {
 			parkdone=false;
 			clear_leds();
 			chThdSleepMilliseconds(5000);
-			nb_instruction--;
 		}
 
 		chThdSleepUntilWindowed(time, time + MS2ST(10)); // Refresh @ 100 Hz

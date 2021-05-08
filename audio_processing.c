@@ -20,13 +20,16 @@ static float micLeft_output[FFT_SIZE];
 
 #define MIN_VALUE_THRESHOLD	10000
 
-#define MIN_FREQ		10	//we don't analyze before this index to not use resources for nothing
-#define FREQ_START		16	//250Hz
-#define FREQ_RIGHT		19	//296Hz
-#define FREQ_LEFT		23	//359HZ
-#define FREQ_RONDPOINT	26	//406Hz
-#define FREQ_PARK		29	//453Hz
-#define MAX_FREQ		32	//we don't analyze after this index to not use resources for nothing
+#define MIN_FREQ				10	//156Hz we don't analyze before this index to not use resources for nothing
+#define FREQ_START				16	//250Hz
+#define FREQ_RIGHT				19	//296Hz
+#define FREQ_LEFT				23	//359HZ
+#define FREQ_RONDPOINT_EXIT1	26	//406Hz
+#define FREQ_RONDPOINT_EXIT2	29	//453Hz
+#define FREQ_RONDPOINT_EXIT3	32	//500Hz
+#define FREQ_RONDPOINT_EXIT4	35	//546Hz
+#define FREQ_PARK				39	//609Hz
+#define MAX_FREQ				41	//640Hz we don't analyze after this index to not use resources for nothing
 
 
 static TO_DO next;
@@ -74,9 +77,21 @@ void sound_remote(float* data){
 	else if(max_norm_index >= (FREQ_LEFT-1) && max_norm_index <= (FREQ_LEFT+1)){
 		next=TURN_LEFT;
 	}
-	//rondpoint
-	else if(max_norm_index >= (FREQ_RONDPOINT-1) && max_norm_index <= (FREQ_RONDPOINT+1)){
-		next=RONDPOINT;
+	//rondpoint exit 1
+	else if(max_norm_index >= (FREQ_RONDPOINT_EXIT1-1) && max_norm_index <= (FREQ_RONDPOINT_EXIT1+1)){
+		next=RONDPOINT_EXIT1;
+	}
+	//rondpoint exit 2
+	else if(max_norm_index >= (FREQ_RONDPOINT_EXIT2-1) && max_norm_index <= (FREQ_RONDPOINT_EXIT2+1)){
+		next=RONDPOINT_EXIT2;
+	}
+	//rondpoint exit 3
+	else if(max_norm_index >= (FREQ_RONDPOINT_EXIT3-1) && max_norm_index <= (FREQ_RONDPOINT_EXIT3+1)){
+		next=RONDPOINT_EXIT3;
+	}
+	//rondpoint exit 4
+	else if(max_norm_index >= (FREQ_RONDPOINT_EXIT4-1) && max_norm_index <= (FREQ_RONDPOINT_EXIT4+1)){
+		next=RONDPOINT_EXIT4;
 	}
 	//park
 	else if(max_norm_index >= (FREQ_PARK-1) && max_norm_index <= (FREQ_PARK+1)){
@@ -172,6 +187,24 @@ float* get_audio_buffer_ptr(BUFFER_NAME_t name){
 
 TO_DO get_next_instruction(void){
 	return next;
+}
+
+TO_DO wayback_instruction(TO_DO instruction_aller){
+	if (instruction_aller==TURN_RIGHT){
+		return TURN_LEFT;
+	}
+	else if (instruction_aller==TURN_LEFT){
+		return TURN_RIGHT;
+	}
+	else if (instruction_aller==RONDPOINT_EXIT1){
+		return RONDPOINT_EXIT3;
+	}
+	else if (instruction_aller==RONDPOINT_EXIT3){
+		return RONDPOINT_EXIT1;
+	}
+	else{
+		return instruction_aller;
+	}
 }
 
 float get_norm(void){

@@ -12,12 +12,15 @@ typedef enum {
 } BUFFER_NAME_t;
 
 typedef enum{
-	START=1,
+	START=-2,
 	TURN_RIGHT,
 	TURN_LEFT,
-	RONDPOINT,
+	RONDPOINT_EXIT1,
+	RONDPOINT_EXIT2,
+	RONDPOINT_EXIT3,
+	RONDPOINT_EXIT4,
 	PARK,
-	GO_BACK
+	ERREUR
 } TO_DO;
 
 
@@ -34,6 +37,9 @@ float* get_audio_buffer_ptr(BUFFER_NAME_t name);
 *	Returns what to do at the next obstacle
 */
 TO_DO get_next_instruction(void);
+
+
+TO_DO wayback_instruction(TO_DO);
 
 float get_norm(void);
 
