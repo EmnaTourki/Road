@@ -18,18 +18,18 @@ static float micLeft_cmplx_input[2 * FFT_SIZE];
 //Arrays containing the computed magnitude of the complex numbers
 static float micLeft_output[FFT_SIZE];
 
-#define MIN_VALUE_THRESHOLD	10000
+#define MIN_VALUE_THRESHOLD	30000
 
-#define MIN_FREQ				10	//156Hz we don't analyze before this index to not use resources for nothing
-#define FREQ_START				16	//250Hz
-#define FREQ_RIGHT				19	//296Hz
-#define FREQ_LEFT				23	//359HZ
-#define FREQ_RONDPOINT_EXIT1	26	//406Hz
-#define FREQ_RONDPOINT_EXIT2	29	//453Hz
-#define FREQ_RONDPOINT_EXIT3	32	//500Hz
-#define FREQ_RONDPOINT_EXIT4	35	//546Hz
-#define FREQ_PARK				39	//609Hz
-#define MAX_FREQ				41	//640Hz we don't analyze after this index to not use resources for nothing
+#define MIN_FREQ				24	//375Hz we don't analyze before this index to not use resources for nothing
+#define FREQ_START				26	//406Hz
+#define FREQ_RIGHT				32	//500Hz
+#define FREQ_LEFT				35	//546Hz
+#define FREQ_RONDPOINT_EXIT1	38	//593HZ
+#define FREQ_RONDPOINT_EXIT2	41	//640Hz
+#define FREQ_RONDPOINT_EXIT3	44	//687Hz
+#define FREQ_RONDPOINT_EXIT4	47	//734Hz
+#define FREQ_PARK				50	//781Hz
+#define MAX_FREQ				52	//812Hz we don't analyze after this index to not use resources for nothing
 
 
 static TO_DO next;
