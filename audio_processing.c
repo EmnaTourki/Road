@@ -18,7 +18,7 @@ static float micLeft_cmplx_input[2 * FFT_SIZE];
 //Arrays containing the computed magnitude of the complex numbers
 static float micLeft_output[FFT_SIZE];
 
-#define MIN_VALUE_THRESHOLD	30000
+#define MIN_VALUE_THRESHOLD		50000.0f
 
 #define MIN_FREQ				24	//375Hz we don't analyze before this index to not use resources for nothing
 #define FREQ_START				26	//406Hz

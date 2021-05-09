@@ -19,6 +19,7 @@
 
 
 #include <audio_processing.h>
+#include <process_image.h>
 #include <move.h>
 
 #include <arm_math.h>
@@ -61,12 +62,18 @@ int main(void)
     proximity_start();
     //starts SPI communication thread.
     spi_comm_start();
+    //starts the camera
+    dcmi_start();
+    po8030_start();
     //starts the microphones processing thread.
     //it calls the callback given in parameter when samples are ready
     mic_start(&processAudioData);
     //start melody thread and the DAC module.
     dac_start();
     playMelodyStart();
+    //stars the threads for the processing of the image
+    process_image_start();
+
     //start the movement thread
     movement_start();
 

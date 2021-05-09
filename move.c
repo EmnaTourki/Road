@@ -9,9 +9,11 @@
 #include <sensors/VL53L0X/VL53L0X.h>
 #include <sensors/proximity.h>
 #include <move.h>
+#include <process_image.h>
 #include <audio_processing.h>
 #include <audio/play_melody.h>
 #include <audio/audio_thread.h>
+#include <camera/po8030.h>
 
 
 
@@ -247,6 +249,7 @@ void park(void){
 void send_to_computer(TO_DO instruction){
 	static uint8_t mustSend = 0;
 	if(mustSend > 8){
+	chprintf((BaseSequentialStream *)&SD3, "lineWidth= %d \r\n", get_lineWidth());
 	chprintf((BaseSequentialStream *)&SD3, "sound= %f \r\n",get_norm());
 	chprintf((BaseSequentialStream *)&SD3, "place dimension= %d \r\n",to_computer_dim);
 	chprintf((BaseSequentialStream *)&SD3, "INSTRUCTION= %d,distance= %d \r\n",instruction,VL53L0X_get_dist_mm());
@@ -257,6 +260,10 @@ void send_to_computer(TO_DO instruction){
 	mustSend = 0;
 	}
 	mustSend++;
+}
+void stop(void){
+	left_motor_set_speed(0);
+	right_motor_set_speed(0);
 }
 
 static THD_WORKING_AREA(waMovement, 1024);
@@ -270,6 +277,7 @@ static THD_FUNCTION(Movement, arg) {
     TO_DO instruction_tab[MAX_NB_INSTRUCTION]={0};
     int8_t nb_instruction=-1;
     bool wayback=0;
+    bool wait=false;
     done=true;
     parkdone=false;
 
@@ -284,15 +292,22 @@ static THD_FUNCTION(Movement, arg) {
 		if(!wayback){
 			if (done) {
 				clear_leds();
-				if ( obstacle_detected(OBS_DIST_38cm,THRESHOLD_38cm) && (get_next_instruction()== PARK) ){
+				if (passage_pieton_detected()){
+					instruction=PASSAGE_PIETON;
+					done=false;
+					wait=true;
+				}
+				else if( obstacle_detected(OBS_DIST_38cm,THRESHOLD_38cm) && (get_next_instruction()== PARK) ){
 						instruction=PARK;
 						done=false;
-				}else if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
+				}
+				else if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
 					nb_instruction++;
 					instruction=get_next_instruction();
 					instruction_tab[nb_instruction]=instruction;
 					done=false;
-				}else{
+				}
+				else{
 					leftSpeed=DEFAULT_SPEED-0.8*get_calibrated_prox(IR1) - 0.4*get_calibrated_prox(IR2);
 					rightSpeed=DEFAULT_SPEED-0.8*get_calibrated_prox(IR8) - 0.4*get_calibrated_prox(IR7);
 				}
@@ -301,16 +316,23 @@ static THD_FUNCTION(Movement, arg) {
 			playMelody(IMPOSSIBLE_MISSION, ML_SIMPLE_PLAY, NULL);
 			if (done) {
 				clear_leds();
-				if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
+				if (passage_pieton_detected()){
+					instruction=PASSAGE_PIETON;
+					done=false;
+					wait=true;
+				}
+				else if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
 					instruction=wayback_instruction(instruction_tab[nb_instruction]);
 					nb_instruction--;
 					done=false;
-				}else if(nb_instruction == -1){
+				}
+				else if(nb_instruction == -1){
 					//THE END
 					stopCurrentMelody();
 					leftSpeed=0;
 					rightSpeed=0;
-				}else{
+				}
+				else{
 					leftSpeed=DEFAULT_SPEED-0.8*get_calibrated_prox(IR1) - 0.4*get_calibrated_prox(IR2);
 					rightSpeed=DEFAULT_SPEED-0.8*get_calibrated_prox(IR8) - 0.4*get_calibrated_prox(IR7);				}
 			}
@@ -335,6 +357,17 @@ static THD_FUNCTION(Movement, arg) {
 					}else{
 						sortie_park();
 					}
+					break;
+				case PASSAGE_PIETON:
+					if (wait){
+						stop();
+						chThdSleepMilliseconds(3000);
+						wait=false;
+					}
+					left_motor_set_speed(DEFAULT_SPEED);
+					right_motor_set_speed(DEFAULT_SPEED);
+					chThdSleepMilliseconds(2000);
+					done=true;
 					break;
 				default:
 					instruction=ERREUR;
