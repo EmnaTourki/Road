@@ -7,13 +7,13 @@
 #include <camera/po8030.h>
 #include <process_image.h>
 
+#define IMAGE_BUFFER_SIZE					640		//pixels
+#define WIDTH_SLOPE							5		//pixels
+#define MIN_LINE_WIDTH						40		//pixels
+#define PASSAGE_PIETON_LINE_WIDTH			200		//pixels
 
-static float distance_cm = -1; //changé de 0
-static int16_t line_position = -1;	// changé int au  lieu de uint et middle en -1
-static uint32_t mean = 0;
-static uint16_t begin=0,end=0;
-static bool passage_pieton=false;
 static uint16_t lineWidth = 0;
+
 
 //semaphore
 static BSEMAPHORE_DECL(image_ready_sem, TRUE);
@@ -24,13 +24,9 @@ static BSEMAPHORE_DECL(image_ready_sem, TRUE);
  */
 uint16_t extract_line_width(uint8_t *buffer){
 
-	uint16_t i = 0, width = 0;
+	uint16_t i = 0, width = 0 ,begin = 0, end = 0;
 	uint8_t stop = 0, wrong_line = 0, line_not_found = 0;
-	//uint32_t mean = 0;
-	//uint16_t begin = 0, end = 0;
-	mean=0,begin=0,end=0;line_position =-1;
-
-	//static uint16_t last_width = PXTOCM/GOAL_DISTANCE;
+	uint32_t mean = 0;
 
 	//performs an average
 	for(uint16_t i =0 ; i <IMAGE_BUFFER_SIZE ; i++){
@@ -49,11 +45,12 @@ uint16_t extract_line_width(uint8_t *buffer){
 		    {
 		        begin = i;
 		        stop = 1;
+		        i=i+WIDTH_SLOPE;
 		    }
 		    i++;
 		}
 		//if a begin was found, search for an end
-		if (i < (IMAGE_BUFFER_SIZE - WIDTH_SLOPE) && begin)
+		if ((i < IMAGE_BUFFER_SIZE) && begin)
 		{
 		    stop = 0;
 		    
@@ -67,7 +64,7 @@ uint16_t extract_line_width(uint8_t *buffer){
 		        i++;
 		    }
 		    //if an end was not found
-		    if (i > IMAGE_BUFFER_SIZE || !end)
+		    if ((i >= IMAGE_BUFFER_SIZE) && (!end))
 		    {
 		        line_not_found = 1;
 		    }
@@ -88,25 +85,12 @@ uint16_t extract_line_width(uint8_t *buffer){
 	}while(wrong_line);
 
 	if(line_not_found){
-		begin = 0;
-		end = 0;
 		width = 0;
-		line_position=-1;
 	}else{
 		width = (end - begin);
-		line_position = (begin + end)/2; //gives the line position.
 	}
 	return width;
 }
-
-void SendUint8ToComputer(uint8_t* data, uint16_t size)
-{
-	chSequentialStreamWrite((BaseSequentialStream *)&SD3, (uint8_t*)"START", 5);
-	chSequentialStreamWrite((BaseSequentialStream *)&SD3, (uint8_t*)&size, sizeof(uint16_t));
-	chSequentialStreamWrite((BaseSequentialStream *)&SD3, (uint8_t*)data, size);
-}
-
-
 
 static THD_WORKING_AREA(waCaptureImage, 256);
 static THD_FUNCTION(CaptureImage, arg) {
@@ -114,7 +98,7 @@ static THD_FUNCTION(CaptureImage, arg) {
     chRegSetThreadName(__FUNCTION__);
     (void)arg;
 
-	//Takes pixels 0 to IMAGE_BUFFER_SIZE of the line 10 + 11 (minimum 2 lines because reasons)
+	//Takes pixels 0 to IMAGE_BUFFER_SIZE of the line 250 + 251 to see the ground and eventually the pedestrian crossing
 	po8030_advanced_config(FORMAT_RGB565, 0, 250, IMAGE_BUFFER_SIZE, 2, SUBSAMPLING_X1, SUBSAMPLING_X1);
 	dcmi_enable_double_buffering();
 	dcmi_set_capture_mode(CAPTURE_ONE_SHOT);
@@ -139,9 +123,7 @@ static THD_FUNCTION(ProcessImage, arg) {
 
 	uint8_t *img_buff_ptr;
 	uint8_t image[IMAGE_BUFFER_SIZE] = {0};
-	//uint16_t lineWidth = 0;
 	lineWidth = 0;
-	bool send_to_computer = true;
 
     while(1){
     	//waits until an image has been captured
@@ -159,37 +141,27 @@ static THD_FUNCTION(ProcessImage, arg) {
 		//search for a line in the image and gets its width in pixels
 		lineWidth = extract_line_width(image);
 
-		passage_pieton=(lineWidth>=200);
-/*
-		//converts the width into a distance between the robot and the camera
-		if(lineWidth){
-			distance_cm = PXTOCM/lineWidth;
-		}else
-		{
-			distance_cm =-1;
-		}
 
-		if(send_to_computer){
-			//sends to the computer the image
-			SendUint8ToComputer(image, IMAGE_BUFFER_SIZE);
-			chprintf((BaseSequentialStream *)&SDU1, "distance1 = %f ,lineWidth = %d \r\n", distance_cm, lineWidth);
-			chprintf((BaseSequentialStream *)&SDU1, "position = %d,begin= %d,end= %d \r\n", line_position,begin,end);
-			chprintf((BaseSequentialStream *)&SDU1, "mean = %d \r\n", mean);
-		}
-		//invert the bool
-		send_to_computer = !send_to_computer;
-*/
     }
 }
 
-bool passage_pieton_detected(void){
-	return passage_pieton;
+/*
+ *  If lineWidth exceeds PASSAGE_PIETON_LINE_WIDTH, there is a pedestrian crossing and the function returns true
+ *  If not returns false
+ */
+bool passage_pieton(void){
+	return (lineWidth>=PASSAGE_PIETON_LINE_WIDTH);
 }
 
+/*
+ * Returns the width (in pixels) of a line calculated in the function extract_line_width
+ */
 uint16_t get_lineWidth(void){
 	return lineWidth;
 }
 
+
+//start the threads
 void process_image_start(void){
 	chThdCreateStatic(waProcessImage, sizeof(waProcessImage), NORMALPRIO, ProcessImage, NULL);
 	chThdCreateStatic(waCaptureImage, sizeof(waCaptureImage), NORMALPRIO, CaptureImage, NULL);
