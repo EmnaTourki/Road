@@ -17,20 +17,27 @@
 
 
 
-#define PI                  	3.1415926536f
-#define WHEEL_DISTANCE      	5.30f   					//cm
-#define PERIMETER_EPUCK     	(PI * WHEEL_DISTANCE)		//cm
-#define NSTEP_ONE_TURN      	1000 						// number of step for 1 turn of the motor
-#define WHEEL_PERIMETER			13 							// cm
-#define POSITION_ROTATION_90 	(0.25*PERIMETER_EPUCK) * NSTEP_ONE_TURN / WHEEL_PERIMETER //step
-#define CORRECTION_ROTATION_90 	1
-#define DEFAULT_SPEED			0.6 * MOTOR_SPEED_LIMIT 	// step/s
-#define OBS_DIST_15cm			130 						// mm
-#define OBS_DIST_38cm			380							// mm
-#define THRESHOLD_15cm			20							// mm
-#define THRESHOLD_38cm			80							// mm
-#define PLACE_DIM_MIN 			480							// step
-#define MAX_NB_INSTRUCTION		20
+#define PI                  		3.1415926536f
+#define WHEEL_DISTANCE      		5.30f   					//cm
+#define PERIMETER_EPUCK     		(PI * WHEEL_DISTANCE)		//cm
+#define NSTEP_ONE_TURN      		1000 						// number of step for 1 turn of the motor
+#define WHEEL_PERIMETER				13 							// cm
+#define POSITION_ROTATION_90 		(0.25*PERIMETER_EPUCK) * NSTEP_ONE_TURN / WHEEL_PERIMETER 	//step
+#define CORRECTION_ROTATION_90 		1
+#define DEFAULT_SIDE_LENGTH			1000						// steps
+#define DEFAULT_SPEED				0.6 * MOTOR_SPEED_LIMIT 	// step/s
+#define LOW_SPEED					0.5 * MOTOR_SPEED_LIMIT 	// step/s
+#define OBS_DIST_15cm				130 						// mm
+#define OBS_DIST_38cm				380							// mm
+#define THRESHOLD_15cm				20							// mm
+#define THRESHOLD_38cm				80							// mm
+#define PLACE_DIM_MIN 				480							// steps
+#define MAX_NB_INSTRUCTION			20
+#define NO_INSTRUCTION				-1
+#define CLOSE_OBST_IR_VALUE			500
+#define OBST_PASSED_IR_VALUE		200
+#define NO_OBST_IR_VALUE			30
+#define LED_INTENSITY				255
 
 static int16_t leftSpeed = 0, rightSpeed = 0;
 static bool done=true;
@@ -38,104 +45,146 @@ static bool parkdone=false;
 static int32_t to_computer_dim=0;
 
 
-//returns true if an obstacle is obs_dist mm away
-bool obstacle_detected(int16_t obs_dist,uint8_t threshold ){
-	return (VL53L0X_get_dist_mm()>=(obs_dist-threshold))
-			&& (VL53L0X_get_dist_mm()<=(obs_dist+threshold));
+/*
+ * This function uses the TOF sensor to calculate the distance from the obstacle.
+ * Returns true if an obstacle is around obst_dist mm away depending on the threshold taken.
+ */
+bool obstacle_detected(uint16_t obst_dist,uint8_t threshold ){
+	return (VL53L0X_get_dist_mm()>=(obst_dist-threshold))
+			&& (VL53L0X_get_dist_mm()<=(obst_dist+threshold));
 }
 
-
+/*
+ * Detects the wall/obstacle on the left of the e_puck using the IR6 sensor
+ * Returns true if that wall/obstacle comes to an end.
+ * Needs to be called in a loop.
+ */
 bool end_left_wall(void){
 	static bool walldetected=0;
-	if (get_calibrated_prox(IR6)>500){
+	if (get_calibrated_prox(IR6)>CLOSE_OBST_IR_VALUE){
 		walldetected=true;
 	}
-	if	((walldetected)&&(get_calibrated_prox(IR6)<200)){
+	if((walldetected)&&(get_calibrated_prox(IR6)<OBST_PASSED_IR_VALUE)){
 		walldetected=false;
 		return true;
-	}else{
-			return false;
-	}
-
+	}else {return false;}
 }
 
+/*
+ * Detects the wall/obstacle on the right of the e_puck using the IR3 sensor
+ * Returns true if that wall/obstacle comes to an end.
+ * Needs to be called in a loop.
+ */
 bool end_right_wall(void){
 	static bool walldetected=0;
-	if (get_calibrated_prox(IR3)>500){
+	if (get_calibrated_prox(IR3)>CLOSE_OBST_IR_VALUE){
 		walldetected=true;
 	}
-	if	((walldetected)&&(get_calibrated_prox(IR3)<200)){
+	if	((walldetected)&&(get_calibrated_prox(IR3)<OBST_PASSED_IR_VALUE)){
 		walldetected=false;
 		return true;
-	}else{
-			return false;
-	}
-
+	}else {return false;}
 }
 
+/*
+ * A function to simulate the turn signals of a car.
+ * Needs to be called in a loop.
+ *
+ * @param :led_1 and led_2 are the LEDs that will blink.
+ */
 void clignotant(rgb_led_name_t led_1,rgb_led_name_t led_2){
 	static uint8_t counter=0;
 	if(counter>10){
-		toggle_rgb_led(led_1, GREEN_LED, 255);
-		toggle_rgb_led(led_2, GREEN_LED, 255);
+		//GREEN+RED=YELLOW LIGHT
+		toggle_rgb_led(led_1, GREEN_LED, LED_INTENSITY);
+		toggle_rgb_led(led_1, RED_LED, LED_INTENSITY);
+
+		toggle_rgb_led(led_2, GREEN_LED, LED_INTENSITY);
+		toggle_rgb_led(led_2, RED_LED, LED_INTENSITY);
+
 		counter=0;
 	}
 	counter++;
 }
 
-
+/*
+ * Rotate the e_puck right at the next obstacle using the IR7 and IR8 front left sensors.
+ * Called in a loop until done becomes true.
+ */
 void rotate_right(void){
+	//Right Turn Signal
 	clignotant(LED2,LED4);
+
 	leftSpeed=0.5*MOTOR_SPEED_LIMIT;
-	rightSpeed =0.5*MOTOR_SPEED_LIMIT - 1.4*get_calibrated_prox(IR8) - 0.42*get_calibrated_prox(IR7);
+	rightSpeed=0.5*MOTOR_SPEED_LIMIT- 1.4*get_calibrated_prox(IR8) - 0.42*get_calibrated_prox(IR7);
 
 	if (end_left_wall()){
+	//Breaks out of the loop when the end of the obstacle is detected.
 		done=true;
 	}
-
 }
 
+/*
+ * Rotate the e_puck left at the next obstacle using the IR1 and IR2 front right sensors.
+ * Called in a loop until done becomes true.
+ */
 void rotate_left(void){
+	//Left Turn Signal
 	clignotant(LED8,LED6);
+
 	leftSpeed=0.5*MOTOR_SPEED_LIMIT- 1.4*get_calibrated_prox(IR1) - 0.42*get_calibrated_prox(IR2);
 	rightSpeed =0.5*MOTOR_SPEED_LIMIT;
 
 	if (end_right_wall()){
-			done=true;
-		}
-
+	//Breaks out of the loop when the end of the obstacle is detected.
+		done=true;
+	}
 }
 
+/*
+ * Used to exit the "roundabout"
+ * Called in a loop until done becomes true.
+ *
+ * @param :int32_t position_to_reach is the position in steps where we want to exit the "roundabout"
+ */
 void sortie_rondpoint(int32_t position_to_reach){
 	static bool reset_position=0;
 
+	//Right Turn Signal
 	clignotant(LED2,LED4);
 
 	if(!reset_position){
+		//first we reset the step counter
 		left_motor_set_pos(0);
 		right_motor_set_pos(0);
 		reset_position=true;
 	}else if((reset_position)&&(left_motor_get_pos()>(position_to_reach))){
+		//when we reach the middle of the roundabout side (value of position_to_reach) , we start a clockwise rotation of 90 degrees
 		leftSpeed= 0.5*MOTOR_SPEED_LIMIT;
-		rightSpeed =-0.5*MOTOR_SPEED_LIMIT;
+		rightSpeed =-0.5* MOTOR_SPEED_LIMIT;
 
 		if((left_motor_get_pos()>=(position_to_reach+CORRECTION_ROTATION_90*POSITION_ROTATION_90))){
-			done=1;
+			//once the rotation is complete,we break out of the loop by setting done true
+			done=true;
 			reset_position=false;
 		}
 	}
 }
 
-void rond_point(uint8_t exit){
+/*
+ * In our route, the roundabout is square.
+ *
+ */
+void rond_point(uint8_t exit_nbr){
 	static uint8_t nb_turn=0;
 	static bool turningleft=0;
-	static int32_t debut=0 ,fin=0,position_to_reach=1000;
+	static int32_t debut=0 ,fin=0,position_to_reach=0.5*DEFAULT_SIDE_LENGTH;
 	if(nb_turn==0){
 		leftSpeed= 0.45*MOTOR_SPEED_LIMIT;
 		rightSpeed =0.5*MOTOR_SPEED_LIMIT-0.7*get_calibrated_prox(IR8) - 0.25*get_calibrated_prox(IR7);
 	}
 	if( (!turningleft)){
-		if( end_left_wall() && (nb_turn!=exit)){
+		if( end_left_wall() && (nb_turn!=exit_nbr)){
 			turningleft=true;
 		}
 		if (nb_turn>=1){
@@ -148,7 +197,7 @@ void rond_point(uint8_t exit){
 				fin=left_motor_get_pos();
 				position_to_reach=0.5*(fin-debut);
 			}
-			if((nb_turn==exit)){
+			if((nb_turn==exit_nbr)){
 				sortie_rondpoint(position_to_reach);
 				if (done){
 					nb_turn=0,debut=0,fin=0,turningleft=false;
@@ -160,13 +209,16 @@ void rond_point(uint8_t exit){
 	else if(turningleft){
 		leftSpeed=0.105*MOTOR_SPEED_LIMIT;
 		rightSpeed =0.5*MOTOR_SPEED_LIMIT;
-		if(get_calibrated_prox(IR7)>500){
+		if(get_calibrated_prox(IR7)>CLOSE_OBST_IR_VALUE){
 			turningleft=false;
 			nb_turn++;
 		}
 	}
 }
 
+/*
+ *
+ */
 bool find_a_place(void){
 	static int32_t debut=0 , fin=0, empty_space_dimension=-1;
 	leftSpeed=0.5*MOTOR_SPEED_LIMIT-0.5*get_calibrated_prox(IR1)- 0.5*get_calibrated_prox(IR2);
@@ -191,6 +243,9 @@ bool find_a_place(void){
 	}
 }
 
+/*
+ *
+ */
 void sortie_park(void){
 	static bool tourne=false;
 
@@ -199,7 +254,8 @@ void sortie_park(void){
 	if(!tourne){
 		leftSpeed= 0.5*MOTOR_SPEED_LIMIT-0.25*get_calibrated_prox(IR2);
 		rightSpeed= 0.5*MOTOR_SPEED_LIMIT-0.25*get_calibrated_prox(IR4);
-		if ( (get_calibrated_prox(IR3)<30)&&(get_calibrated_prox(IR6)<30)&&(get_calibrated_prox(IR4)<30)&&(get_calibrated_prox(IR5)<30)){
+		if ( (get_calibrated_prox(IR3)<NO_OBST_IR_VALUE)&&(get_calibrated_prox(IR6)<NO_OBST_IR_VALUE)
+				&&(get_calibrated_prox(IR4)<NO_OBST_IR_VALUE)&&(get_calibrated_prox(IR5)<NO_OBST_IR_VALUE)){
 				tourne=true;
 				left_motor_set_pos(0);
 				right_motor_set_pos(0);
@@ -215,6 +271,9 @@ void sortie_park(void){
 
 }
 
+/*
+ *
+ */
 void park(void){
 	static bool place_found=0, tourne_marche_arriere=true;
 
@@ -229,7 +288,7 @@ void park(void){
 		}else if(!tourne_marche_arriere){
 			leftSpeed=-0.5*MOTOR_SPEED_LIMIT+5*get_calibrated_prox(IR4);
 			rightSpeed =-0.5*MOTOR_SPEED_LIMIT+0.25*get_calibrated_prox(IR2);
-			if( (get_calibrated_prox(IR4)<30)&&(get_calibrated_prox(IR5)<30)&&(get_calibrated_prox(IR2)>200) ){
+			if( (get_calibrated_prox(IR4)<NO_OBST_IR_VALUE)&&(get_calibrated_prox(IR5)<NO_OBST_IR_VALUE)&&(get_calibrated_prox(IR2)>OBST_PASSED_IR_VALUE) ){
 				parkdone=true;
 				leftSpeed=0;
 				rightSpeed=0;
@@ -242,10 +301,26 @@ void park(void){
 	}
 }
 
+void stop_motors(void){
+	left_motor_set_speed(0);
+	right_motor_set_speed(0);
+}
 
+/*
+ *
+ */
+void pedestrian_crossing(void){
+	stop_motors();
+	chThdSleepMilliseconds(3000);
+	left_motor_set_speed(DEFAULT_SPEED);
+	right_motor_set_speed(DEFAULT_SPEED);
+	chThdSleepMilliseconds(2000);
+	done=true;
+}
 
-
-
+/*
+ *
+ */
 void send_to_computer(TO_DO instruction){
 	static uint8_t mustSend = 0;
 	if(mustSend > 8){
@@ -253,17 +328,12 @@ void send_to_computer(TO_DO instruction){
 	chprintf((BaseSequentialStream *)&SD3, "sound= %f \r\n",get_norm());
 	chprintf((BaseSequentialStream *)&SD3, "place dimension= %d \r\n",to_computer_dim);
 	chprintf((BaseSequentialStream *)&SD3, "INSTRUCTION= %d,distance= %d \r\n",instruction,VL53L0X_get_dist_mm());
-	chprintf((BaseSequentialStream *)&SD3, "speed\r\n");
-	chprintf((BaseSequentialStream *)&SD3, "%4d,%4d,\r\n\n",leftSpeed,rightSpeed);
-	chprintf((BaseSequentialStream *)&SD3, "Calibrated\r\n");
-	chprintf((BaseSequentialStream *)&SD3, "%4d,%4d,%4d,%4d,%4d,%4d,%4d,%4d\r\n\n", get_calibrated_prox(IR1), get_calibrated_prox(IR2),get_calibrated_prox(IR3),get_calibrated_prox(IR4), get_calibrated_prox(IR5), get_calibrated_prox(IR6), get_calibrated_prox(IR7), get_calibrated_prox(IR8));
+	chprintf((BaseSequentialStream *)&SD3, "speed: %4d,%4d,\r\n",leftSpeed,rightSpeed);
+	chprintf((BaseSequentialStream *)&SD3, "Calibrated IR: %4d,%4d,%4d,%4d,%4d,%4d,%4d,%4d,\r\n", get_calibrated_prox(IR1), get_calibrated_prox(IR2),
+	get_calibrated_prox(IR3),get_calibrated_prox(IR4), get_calibrated_prox(IR5), get_calibrated_prox(IR6), get_calibrated_prox(IR7), get_calibrated_prox(IR8));
 	mustSend = 0;
 	}
 	mustSend++;
-}
-void stop(void){
-	left_motor_set_speed(0);
-	right_motor_set_speed(0);
 }
 
 static THD_WORKING_AREA(waMovement, 1024);
@@ -275,9 +345,8 @@ static THD_FUNCTION(Movement, arg) {
     systime_t time;
     TO_DO instruction=0;
     TO_DO instruction_tab[MAX_NB_INSTRUCTION]={0};
-    int8_t nb_instruction=-1;
+    int8_t nb_instruction=NO_INSTRUCTION;
     bool wayback=0;
-    bool wait=false;
     done=true;
     parkdone=false;
 
@@ -292,10 +361,9 @@ static THD_FUNCTION(Movement, arg) {
 		if(!wayback){
 			if (done) {
 				clear_leds();
-				if (passage_pieton_detected()){
+				if (passage_pieton()){
 					instruction=PASSAGE_PIETON;
 					done=false;
-					wait=true;
 				}
 				else if( obstacle_detected(OBS_DIST_38cm,THRESHOLD_38cm) && (get_next_instruction()== PARK) ){
 						instruction=PARK;
@@ -316,17 +384,16 @@ static THD_FUNCTION(Movement, arg) {
 			playMelody(IMPOSSIBLE_MISSION, ML_SIMPLE_PLAY, NULL);
 			if (done) {
 				clear_leds();
-				if (passage_pieton_detected()){
+				if (passage_pieton()){
 					instruction=PASSAGE_PIETON;
 					done=false;
-					wait=true;
 				}
 				else if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
 					instruction=wayback_instruction(instruction_tab[nb_instruction]);
 					nb_instruction--;
 					done=false;
 				}
-				else if(nb_instruction == -1){
+				else if(nb_instruction == NO_INSTRUCTION){
 					//THE END
 					stopCurrentMelody();
 					leftSpeed=0;
@@ -359,15 +426,7 @@ static THD_FUNCTION(Movement, arg) {
 					}
 					break;
 				case PASSAGE_PIETON:
-					if (wait){
-						stop();
-						chThdSleepMilliseconds(3000);
-						wait=false;
-					}
-					left_motor_set_speed(DEFAULT_SPEED);
-					right_motor_set_speed(DEFAULT_SPEED);
-					chThdSleepMilliseconds(2000);
-					done=true;
+					pedestrian_crossing();
 					break;
 				default:
 					instruction=ERREUR;
