@@ -4,20 +4,14 @@
 #include <usbcfg.h>
 #include <chprintf.h>
 
+#include <move.h>
 #include <audio/microphone.h>
 #include <audio_processing.h>
 
 #include <arm_math.h>
 #include <arm_const_structs.h>
 
-//semaphore
-static BSEMAPHORE_DECL(start_sem, TRUE);
-//2 times FFT_SIZE because these arrays contain complex numbers (real + imaginary)
-static float micLeft_cmplx_input[2 * FFT_SIZE];
-
-//Arrays containing the computed magnitude of the complex numbers
-static float micLeft_output[FFT_SIZE];
-
+#define FFT_SIZE 	1024
 #define MIN_VALUE_THRESHOLD		50000.0f
 
 #define MIN_FREQ				24	//375Hz we don't analyze before this index to not use resources for nothing
@@ -31,9 +25,15 @@ static float micLeft_output[FFT_SIZE];
 #define FREQ_PARK				50	//781Hz
 #define MAX_FREQ				52	//812Hz we don't analyze after this index to not use resources for nothing
 
+//semaphore
+static BSEMAPHORE_DECL(start_sem, TRUE);
+//2 times FFT_SIZE because these arrays contain complex numbers (real + imaginary)
+static float micLeft_cmplx_input[2 * FFT_SIZE];
+//Arrays containing the computed magnitude of the complex numbers
+static float micLeft_output[FFT_SIZE];
 
 static TO_DO next;
-static float max_norm;// à enlever !!
+static float max_norm;// sent to computer !!to remove!!
 
 
 
@@ -42,22 +42,23 @@ static float max_norm;// à enlever !!
 *	which uses a lot of tricks to optimize the computations
 */
 void doFFT_optimized(uint16_t size, float* complex_buffer){
-	if(size == 1024)
+	if(size == FFT_SIZE)
 		arm_cfft_f32(&arm_cfft_sR_f32_len1024, complex_buffer, 0, 1);
 }
 
 /*
-*	Simple function used to detect the index of the highest value in a buffer
-*	and to decide what to do at the next obstacle depending on it
+*	This function detects the index of the highest value in a buffer
+*	and then depending on it, put in the variable "next" the instruction to do at the next obstacle.
+*	If none of the provided frequencies is heard, we stay with the old instruction.
 */
-void sound_remote(float* data){
+void sound_instruction(float* data){
 
 	max_norm = MIN_VALUE_THRESHOLD;
-	int16_t max_norm_index = -1; 
+	int8_t max_norm_index = -1;
 	static TO_DO ancien;
 
 	//search for the highest peak
-	for(uint16_t i = MIN_FREQ ; i <= MAX_FREQ ; i++){
+	for(int8_t i = MIN_FREQ ; i <= MAX_FREQ ; i++){
 		if(data[i] > max_norm){
 			max_norm = data[i];
 			max_norm_index = i;
@@ -65,50 +66,50 @@ void sound_remote(float* data){
 	}
 
 	//START
-	if(max_norm_index >= (FREQ_START-1) && max_norm_index <= (FREQ_START+1)){
+	if((max_norm_index >= (FREQ_START-1)) && (max_norm_index <= (FREQ_START+1))){
 		next=START;
 		chBSemSignal(&start_sem);
 	}
 	//turn right
-	else if(max_norm_index >= (FREQ_RIGHT-1) && max_norm_index <= (FREQ_RIGHT+1)){
+	else if((max_norm_index >= (FREQ_RIGHT-1)) && (max_norm_index <= (FREQ_RIGHT+1))){
 		next=TURN_RIGHT;
 	}
 	//turn left
-	else if(max_norm_index >= (FREQ_LEFT-1) && max_norm_index <= (FREQ_LEFT+1)){
+	else if((max_norm_index >= (FREQ_LEFT-1)) && (max_norm_index <= (FREQ_LEFT+1))){
 		next=TURN_LEFT;
 	}
 	//rondpoint exit 1
-	else if(max_norm_index >= (FREQ_RONDPOINT_EXIT1-1) && max_norm_index <= (FREQ_RONDPOINT_EXIT1+1)){
+	else if((max_norm_index >= (FREQ_RONDPOINT_EXIT1-1)) && (max_norm_index <= (FREQ_RONDPOINT_EXIT1+1))){
 		next=RONDPOINT_EXIT1;
 	}
 	//rondpoint exit 2
-	else if(max_norm_index >= (FREQ_RONDPOINT_EXIT2-1) && max_norm_index <= (FREQ_RONDPOINT_EXIT2+1)){
+	else if((max_norm_index >= (FREQ_RONDPOINT_EXIT2-1)) && (max_norm_index <= (FREQ_RONDPOINT_EXIT2+1))){
 		next=RONDPOINT_EXIT2;
 	}
 	//rondpoint exit 3
-	else if(max_norm_index >= (FREQ_RONDPOINT_EXIT3-1) && max_norm_index <= (FREQ_RONDPOINT_EXIT3+1)){
+	else if((max_norm_index >= (FREQ_RONDPOINT_EXIT3-1)) && (max_norm_index <= (FREQ_RONDPOINT_EXIT3+1))){
 		next=RONDPOINT_EXIT3;
 	}
 	//rondpoint exit 4
-	else if(max_norm_index >= (FREQ_RONDPOINT_EXIT4-1) && max_norm_index <= (FREQ_RONDPOINT_EXIT4+1)){
+	else if((max_norm_index >= (FREQ_RONDPOINT_EXIT4-1)) && (max_norm_index <= (FREQ_RONDPOINT_EXIT4+1))){
 		next=RONDPOINT_EXIT4;
 	}
 	//park
-	else if(max_norm_index >= (FREQ_PARK-1) && max_norm_index <= (FREQ_PARK+1)){
+	else if((max_norm_index >= (FREQ_PARK-1)) && (max_norm_index <= (FREQ_PARK+1))){
 		next=PARK;
 	}
 	else{
+	//if none of the above instructions is taken, we stay with the old one
 		next=ancien;
 	}
 	ancien=next;
-	
 }
 
 /*
-*	Callback called when the demodulation of the four microphones is done.
+*	@brief: Callback called when the demodulation of the four microphones is done.
 *	We get 160 samples per mic every 10ms (16kHz)
 *	
-*	params :
+*	@params :
 *	int16_t *data			Buffer containing 4 times 160 samples. the samples are sorted by micro
 *							so we have [micRight1, micLeft1, micBack1, micFront1, micRight2, etc...]
 *	uint16_t num_samples	Tells how many data we get in total (should always be 640)
@@ -143,7 +144,7 @@ void processAudioData(int16_t *data, uint16_t num_samples){
 	}
 
 	if(nb_samples >= (2 * FFT_SIZE)){
-		/*	FFT proccessing
+		/*	FFT processing
 		*
 		*	This FFT function stores the results in the input buffer given.
 		*	This is an "In Place" function. 
@@ -163,32 +164,31 @@ void processAudioData(int16_t *data, uint16_t num_samples){
 
 		nb_samples = 0;
 
-		sound_remote(micLeft_output);
+		sound_instruction(micLeft_output);
 	}
 }
-
+/*
+ * Waits until a start signal (FREQ_START sound) is detected
+ * Semaphore's status modified in the function sound_instruction.
+ */
 void wait_start_signal(void){
 	chBSemWait(&start_sem);
 }
 
-float* get_audio_buffer_ptr(BUFFER_NAME_t name){
-	if(name == LEFT_CMPLX_INPUT){
-		return micLeft_cmplx_input;
-	}
 
-	else if (name == LEFT_OUTPUT){
-		return micLeft_output;
-	}
-
-	else{
-		return NULL;
-	}
-}
-
+/*
+*	Returns the variable "next" which indicates the instruction to do at the next obstacle.
+*	This variable is modified in the function sound_instruction.
+*/
 TO_DO get_next_instruction(void){
 	return next;
 }
 
+/*
+*	@brief: Depending on the parameter instruction_aller returns what to do at the next obstacle.
+*
+*	@param TO_DO instruction_aller : indicates the instruction that the e-puck took in front of an obstacle in that same position on the way out.
+*/
 TO_DO wayback_instruction(TO_DO instruction_aller){
 	if (instruction_aller==TURN_RIGHT){
 		return TURN_LEFT;
@@ -203,6 +203,8 @@ TO_DO wayback_instruction(TO_DO instruction_aller){
 		return RONDPOINT_EXIT1;
 	}
 	else{
+		//RONDPOINT_EXIT2 and RONDPOINT_EXIT4 stay the same
+		//PARK and PASSAGE_PIETON cannot be taken as parameter instruction_aller
 		return instruction_aller;
 	}
 }
