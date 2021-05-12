@@ -14,6 +14,7 @@
 #define PASSAGE_PIETON_LINE_WIDTH			200		//pixels
 #define COUNTER_MAX_VALUE					7
 #define COUNTER_FIN_MAX_VALUE				10
+#define BUFFER_LINE							280
 
 static uint16_t lineWidth = 0;
 
@@ -101,8 +102,8 @@ static THD_FUNCTION(CaptureImage, arg) {
     chRegSetThreadName(__FUNCTION__);
     (void)arg;
 
-	//Takes pixels 0 to IMAGE_BUFFER_SIZE of the line 250 + 251 to see the ground and eventually the pedestrian crossing
-	po8030_advanced_config(FORMAT_RGB565, 0, 280, IMAGE_BUFFER_SIZE, 2, SUBSAMPLING_X1, SUBSAMPLING_X1);
+	//Takes pixels 0 to IMAGE_BUFFER_SIZE of the line 280 + 281 to see the ground and eventually the pedestrian crossing
+	po8030_advanced_config(FORMAT_RGB565, 0, BUFFER_LINE, IMAGE_BUFFER_SIZE, 2, SUBSAMPLING_X1, SUBSAMPLING_X1);
 	dcmi_enable_double_buffering();
 	dcmi_set_capture_mode(CAPTURE_ONE_SHOT);
 	dcmi_prepare();

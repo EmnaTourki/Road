@@ -33,7 +33,7 @@ static float micLeft_cmplx_input[2 * FFT_SIZE];
 static float micLeft_output[FFT_SIZE];
 
 static TO_DO next;
-static float max_norm;// sent to computer !!to remove!!
+static float max_norm;// sent to computer
 
 
 
@@ -49,7 +49,7 @@ void doFFT_optimized(uint16_t size, float* complex_buffer){
 /*
 *	This function detects the index of the highest value in a buffer
 *	and then depending on it, put in the variable "next" the instruction to do at the next obstacle.
-*	If none of the provided frequencies is heard, we stay with the old instruction.
+*	If none of the provided frequencies is heard, we stay with the previous instruction.
 */
 void sound_instruction(float* data){
 
@@ -78,19 +78,19 @@ void sound_instruction(float* data){
 	else if((max_norm_index >= (FREQ_LEFT-1)) && (max_norm_index <= (FREQ_LEFT+1))){
 		next=TURN_LEFT;
 	}
-	//rondpoint exit 1
+	//roundabout exit 1
 	else if((max_norm_index >= (FREQ_RONDPOINT_EXIT1-1)) && (max_norm_index <= (FREQ_RONDPOINT_EXIT1+1))){
 		next=RONDPOINT_EXIT1;
 	}
-	//rondpoint exit 2
+	//roundabout exit 2
 	else if((max_norm_index >= (FREQ_RONDPOINT_EXIT2-1)) && (max_norm_index <= (FREQ_RONDPOINT_EXIT2+1))){
 		next=RONDPOINT_EXIT2;
 	}
-	//rondpoint exit 3
+	//roundabout exit 3
 	else if((max_norm_index >= (FREQ_RONDPOINT_EXIT3-1)) && (max_norm_index <= (FREQ_RONDPOINT_EXIT3+1))){
 		next=RONDPOINT_EXIT3;
 	}
-	//rondpoint exit 4
+	//roundabout exit 4
 	else if((max_norm_index >= (FREQ_RONDPOINT_EXIT4-1)) && (max_norm_index <= (FREQ_RONDPOINT_EXIT4+1))){
 		next=RONDPOINT_EXIT4;
 	}
@@ -187,7 +187,7 @@ TO_DO get_next_instruction(void){
 /*
 *	@brief: Depending on the parameter instruction_aller returns what to do at the next obstacle.
 *
-*	@param TO_DO instruction_aller : indicates the instruction that the e-puck took in front of an obstacle in that same position on the way out.
+*	@param TO_DO instruction_aller : indicates the instruction taken in front of an obstacle in that same position on the way out.
 */
 TO_DO wayback_instruction(TO_DO instruction_aller){
 	if (instruction_aller==TURN_RIGHT){

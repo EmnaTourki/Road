@@ -23,6 +23,7 @@
 #define PERIMETER_EPUCK     		(PI * WHEEL_DISTANCE)		//cm
 #define NSTEP_ONE_TURN      		1000 						// number of step for 1 turn of the motor
 #define WHEEL_PERIMETER				13 							// cm
+
 #define POSITION_ROTATION_90 		(0.25*PERIMETER_EPUCK) * NSTEP_ONE_TURN / WHEEL_PERIMETER 	//step
 #define CORRECTION_ROTATION_90 		1
 #define DEFAULT_SIDE_LENGTH			1000						// steps
@@ -369,14 +370,16 @@ void park(void){
 	}
 }
 
-
+/*
+ * stops the motors
+ */
  void stop_motors(void){
 	 left_motor_set_speed(0);
 	 right_motor_set_speed(0);
  }
 
 /*
- * Used to Cross the pedestrian_crossing
+ * Used to cross the pedestrian crossing
  * stop if obstacle detected
  * Called in a loop until done becomes true.
  */
@@ -390,6 +393,7 @@ void pedestrian_crossing(void){
 	}else{
 		//obstacle detected
 		pedestrian_detected=true;
+		//stops
 		leftSpeed=0;
 		rightSpeed=0;
 	}
@@ -435,54 +439,73 @@ static THD_FUNCTION(Movement, arg) {
 
     //waits until a start signal (FREQ_START sound) is detected
 	wait_start_signal();
+	//calibrate IR sensors
 	calibrate_ir();
 
     while(1){
 		time = chVTGetSystemTime();
 
 		if(!wayback){
+			//on the way out
 			if (done) {
+				// if the previous instruction is done, we keep moving forward until we take a new instruction
 				clear_leds();
+
 				if (passage_pieton()){
+					// a pedestrian crossing is detected with the camera
 					instruction=PASSAGE_PIETON;
 					wait=true;
 					done=false;
 				}
 				else if( obstacle_detected(OBS_DIST_38cm,THRESHOLD_38cm) && (get_next_instruction()== PARK) ){
+					// an obstacle(representing a road sign) is detected around 38 cm away and the last instruction heard is to park
 						instruction=PARK;
 						done=false;
 				}
 				else if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
-					nb_instruction++;
+					//an obstacle(representing a road sign) is detected around 15 cm away
+					//check what's the instruction to do
 					instruction=get_next_instruction();
+					nb_instruction++;
+					//record the instructions in a tab so that we can do the way back based on it.
 					instruction_tab[nb_instruction]=instruction;
 					done=false;
 				}
 				else{
+					//if no instruction was taken, we move forward and deviate to the right or left if any obstacle (wall) is too close.
 					leftSpeed=DEFAULT_SPEED-AVOID_OBST_H_COEF*get_calibrated_prox(IR1) - AVOID_OBST_L_COEF*get_calibrated_prox(IR2);
 					rightSpeed=DEFAULT_SPEED-AVOID_OBST_H_COEF*get_calibrated_prox(IR8) - AVOID_OBST_L_COEF*get_calibrated_prox(IR7);
 				}
 			}
 		}
 		else if((wayback)&&(!the_end)){
+			//on the way back home
+			//play a melody
 			playMelody(IMPOSSIBLE_MISSION, ML_SIMPLE_PLAY, NULL);
 			if (done) {
+				// if the previous instruction is done, we keep moving forward until we take a new instruction
 				clear_leds();
 				if (passage_pieton()){
+					// a pedestrian crossing is detected with the camera
 					instruction=PASSAGE_PIETON;
 					wait=true;
 					done=false;
 				}else if(nb_instruction == NO_INSTRUCTION){
+					//if we have already done the last instruction in the table
 					//THE END
+					the_end=true;
+					//stops the melody and stops the motors
 					stopCurrentMelody();
 					leftSpeed=0;
 					rightSpeed=0;
-					the_end=true;
 				}else if(obstacle_detected(OBS_DIST_15cm,THRESHOLD_15cm)){
+					//an obstacle(representing a road sign) is detected around 15 cm away
+					//check what's the instruction to do based on the table filled in on the way out
 					instruction=wayback_instruction(instruction_tab[nb_instruction]);
 					nb_instruction--;
 					done=false;
 				}else{
+					//if no instruction was taken, we move forward and deviate to the right or left if any obstacle (wall) is too close.
 					leftSpeed=DEFAULT_SPEED-AVOID_OBST_H_COEF*get_calibrated_prox(IR1) - AVOID_OBST_L_COEF*get_calibrated_prox(IR2);
 					rightSpeed=DEFAULT_SPEED-AVOID_OBST_H_COEF*get_calibrated_prox(IR8) - AVOID_OBST_L_COEF*get_calibrated_prox(IR7);
 				}
@@ -501,27 +524,30 @@ static THD_FUNCTION(Movement, arg) {
 					rotate_left();
 					break;
 				case RONDPOINT_EXIT1...RONDPOINT_EXIT4 :
+				//this function takes as parameter the number of left turns the e_puck makes before exiting the roundabout.
+				//which corresponds to the enumeration of the instruction taken
 					rond_point(instruction);
 					break;
 				case PARK:
 					if(!wayback){
 						park();
 					}else{
-						//wayback
+						//because park is always the last instruction taken on the way out
+						//this is always the first instruction to do on the way back home
 						sortie_park();
 					}
 					break;
 				case PASSAGE_PIETON:
 					if(wait){
-						//waits
+						//stop the motors and wait 3 seconds
 						stop_motors();
 						chThdSleepMilliseconds(3000);
 						wait=false;
 					}
+					//cross the pedestrian crossing if no obstacle(pedestrian) is detected
 					pedestrian_crossing();
 					break;
 				default:
-					instruction=ERREUR;
 					leftSpeed=0;
 					rightSpeed=0;
 					break;
@@ -534,10 +560,14 @@ static THD_FUNCTION(Movement, arg) {
 		right_motor_set_speed(rightSpeed);
 
 		if (parkdone){
-			wayback=true;
+			//reinitialize variable
 			parkdone=false;
 			clear_leds();
+			//park is always the last instruction in every set of instructions on the way out
+			//once the park done , wait 5 seconds
 			chThdSleepMilliseconds(5000);
+			//then start the way back home by leaving the parking so without changing the instruction "PARK"
+			wayback=true;
 		}
 
 		chThdSleepUntilWindowed(time, time + MS2ST(10)); // Refresh @ 100 Hz

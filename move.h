@@ -19,7 +19,6 @@ typedef enum{
 	RONDPOINT_EXIT4,
 	PARK,
 	PASSAGE_PIETON,
-	ERREUR
 } TO_DO;
 
 
