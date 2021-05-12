@@ -14,6 +14,8 @@
 #include <sensors/VL53L0X/VL53L0X.h>
 #include <sensors/proximity.h>
 #include <spi_comm.h>
+#include <camera/po8030.h>
+#include <camera/dcmi_camera.h>
 #include <audio/audio_thread.h>
 #include <audio/play_melody.h>
 

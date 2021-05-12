@@ -5,12 +5,15 @@
 
 #include <main.h>
 #include <camera/po8030.h>
+#include <camera/dcmi_camera.h>
 #include <process_image.h>
 
 #define IMAGE_BUFFER_SIZE					640		//pixels
 #define WIDTH_SLOPE							5		//pixels
 #define MIN_LINE_WIDTH						40		//pixels
 #define PASSAGE_PIETON_LINE_WIDTH			200		//pixels
+#define COUNTER_MAX_VALUE					7
+#define COUNTER_FIN_MAX_VALUE				10
 
 static uint16_t lineWidth = 0;
 
@@ -92,14 +95,14 @@ uint16_t extract_line_width(uint8_t *buffer){
 	return width;
 }
 
-static THD_WORKING_AREA(waCaptureImage, 256);
+static THD_WORKING_AREA(waCaptureImage, 512);
 static THD_FUNCTION(CaptureImage, arg) {
 
     chRegSetThreadName(__FUNCTION__);
     (void)arg;
 
 	//Takes pixels 0 to IMAGE_BUFFER_SIZE of the line 250 + 251 to see the ground and eventually the pedestrian crossing
-	po8030_advanced_config(FORMAT_RGB565, 0, 250, IMAGE_BUFFER_SIZE, 2, SUBSAMPLING_X1, SUBSAMPLING_X1);
+	po8030_advanced_config(FORMAT_RGB565, 0, 280, IMAGE_BUFFER_SIZE, 2, SUBSAMPLING_X1, SUBSAMPLING_X1);
 	dcmi_enable_double_buffering();
 	dcmi_set_capture_mode(CAPTURE_ONE_SHOT);
 	dcmi_prepare();
@@ -115,7 +118,7 @@ static THD_FUNCTION(CaptureImage, arg) {
 }
 
 
-static THD_WORKING_AREA(waProcessImage, 1024);
+static THD_WORKING_AREA(waProcessImage, 2048);
 static THD_FUNCTION(ProcessImage, arg) {
 
     chRegSetThreadName(__FUNCTION__);
@@ -146,13 +149,39 @@ static THD_FUNCTION(ProcessImage, arg) {
 }
 
 /*
- *  If lineWidth exceeds PASSAGE_PIETON_LINE_WIDTH, there is a pedestrian crossing and the function returns true
+ *  If lineWidth exceeds PASSAGE_PIETON_LINE_WIDTH COUNTER_MAX_VALUE times , there is a pedestrian crossing and the function returns true
  *  If not returns false
  */
 bool passage_pieton(void){
-	return (lineWidth>=PASSAGE_PIETON_LINE_WIDTH);
+	static uint8_t counter=0;
+	if (lineWidth>=PASSAGE_PIETON_LINE_WIDTH){
+		counter++;
+		if(counter>=COUNTER_MAX_VALUE){
+			counter=0;
+			return true;
+		}else return false;
+	}else{
+		counter=0;
+		return false;
+	}
 }
 
+/*
+ * If no line is detected COUNTER_MAX_VALUE times, we crossed the pedestrian crossing and the function returns true
+ */
+bool fin_passage_pieton(void){
+	static uint8_t counter=0;
+	if(lineWidth==0){
+		counter++;
+		if(counter>=COUNTER_FIN_MAX_VALUE){
+			counter=0;
+			return true;
+		}else return false;
+	}else{
+		counter=0;
+		return false;
+	}
+}
 /*
  * Returns the width (in pixels) of a line calculated in the function extract_line_width
  */
