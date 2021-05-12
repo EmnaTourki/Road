@@ -18,43 +18,50 @@
 
 
 
-#define PI                  		3.1415926536f
-#define WHEEL_DISTANCE      		5.30f   					//cm
-#define PERIMETER_EPUCK     		(PI * WHEEL_DISTANCE)		//cm
-#define NSTEP_ONE_TURN      		1000 						// number of step for 1 turn of the motor
-#define WHEEL_PERIMETER				13 							// cm
+#define PI                  			3.1415926536f
+#define WHEEL_DISTANCE      			5.30f   					//cm
+#define PERIMETER_EPUCK     			(PI * WHEEL_DISTANCE)		//cm
+#define NSTEP_ONE_TURN      			1000 						// number of step for 1 turn of the motor
+#define WHEEL_PERIMETER					13 							// cm
 
-#define POSITION_ROTATION_90 		(0.25*PERIMETER_EPUCK) * NSTEP_ONE_TURN / WHEEL_PERIMETER 	//step
-#define CORRECTION_ROTATION_90 		1
-#define DEFAULT_SIDE_LENGTH			1000						// steps
-#define DEFAULT_SPEED				0.6 * MOTOR_SPEED_LIMIT 	// step/s
-#define LOW_SPEED_COEF				0.1
-#define LOW_SPEED_COEF_PARK			0.13
-#define NORMAL_SPEED_COEF			0.5
-#define LOWER_SPEED_COEF			0.45
-#define LOWER_SPEED_COEF_PARK		0.39
-#define OBS_DIST_15cm				130 						// mm
-#define OBS_DIST_38cm				380							// mm
-#define THRESHOLD_15cm				20							// mm
-#define THRESHOLD_38cm				80							// mm
-#define PLACE_DIM_MIN 				480							// steps
-#define MAX_NB_INSTRUCTION			50
-#define NO_INSTRUCTION				-1
-#define CLOSE_OBST_IR_VALUE			500
-#define DETECT_OBST_IR_VALUE		450
-#define OBST_PASSED_IR_VALUE		200
-#define OBST_DETECT_BACK_IR_VALUE	150
-#define NO_OBST_IR_VALUE			30
-#define ROTATE_H_IR_COEF			1.4
-#define ROTATE_L_IR_COEF			0.42
-#define ROTATION_IR_COEF			0.5
-#define ROTATION_H_IR_COEF			0.7
-#define ROTATION_L_IR_COEF			0.25
-#define ROTATION_H_COEF				5
-#define AVOID_OBST_H_COEF			0.8
-#define AVOID_OBST_L_COEF			0.4
+#define POSITION_ROTATION_90 			(0.25*PERIMETER_EPUCK) * NSTEP_ONE_TURN / WHEEL_PERIMETER 	//step
+#define CORRECTION_ROTATION_90 			1
+#define DEFAULT_SIDE_LENGTH				1000						// steps
+#define DEFAULT_SPEED					0.6 * MOTOR_SPEED_LIMIT 	// step/s
+#define LOW_SPEED_COEF					0.1
+#define LOW_SPEED_COEF_PARK				0.13
+#define NORMAL_SPEED_COEF				0.5
+#define LOWER_SPEED_COEF				0.45
+#define LOWER_SPEED_COEF_PARK			0.39
+#define OBS_DIST_15cm					130 						// mm
+#define OBS_DIST_38cm					380							// mm
+#define THRESHOLD_15cm					20							// mm
+#define THRESHOLD_38cm					80							// mm
+#define PLACE_DIM_MIN 					480							// steps
+#define MAX_NB_INSTRUCTION				50
+#define NO_INSTRUCTION					-1
+#define CLOSE_OBST_IR_VALUE				500
+#define DETECT_OBST_IR_VALUE			450
+#define OBST_PASSED_IR_VALUE			200
+#define OBST_DETECT_BACK_IR_VALUE		150
+#define NO_OBST_IR_VALUE				30
+#define ROTATE_H_IR_COEF				1.4
+#define ROTATE_L_IR_COEF				0.42
+#define ROTATION_IR_COEF				0.5
+#define ROTATION_H_IR_COEF				0.7
+#define ROTATION_L_IR_COEF				0.25
+#define ROTATION_H_COEF					5
+#define AVOID_OBST_H_COEF				0.8
+#define AVOID_OBST_L_COEF				0.4
+#define PARK_WAIT_TIME					5000
+#define PEDESTRIAN_CROSSING_WAIT_TIME	3000
+#define FREQUENCY_100HZ					10
+#define LED_INTENSITY					255
+#define MAX_COUNTER						8
+#define MAX_COUNTER_CLIGNOTANT			10
+#define FIRST_TURN						1
+#define SECOND_TURN						2
 
-#define LED_INTENSITY				255
 
 static int16_t leftSpeed = 0, rightSpeed = 0;
 static uint8_t done=true;
@@ -113,7 +120,7 @@ bool end_right_wall(void){
  */
 void clignotant(rgb_led_name_t led_1,rgb_led_name_t led_2){
 	static uint8_t counter=0;
-	if(counter>10){
+	if(counter>MAX_COUNTER_CLIGNOTANT){
 		//GREEN+RED=YELLOW LIGHT
 		toggle_rgb_led(led_1, GREEN_LED, LED_INTENSITY);
 		toggle_rgb_led(led_1, RED_LED, LED_INTENSITY);
@@ -214,7 +221,7 @@ void rond_point(uint8_t exit_nbr){
 			turningleft=true;
 		}
 
-		if (nb_turn>=1){
+		if (nb_turn>=FIRST_TURN){
 			//we follow the wall which is always in our left by leaning a little to the left
 			//and having the IR left sensors swerve us to the right if too close.
 			leftSpeed= LOWER_SPEED_COEF*MOTOR_SPEED_LIMIT;
@@ -222,10 +229,10 @@ void rond_point(uint8_t exit_nbr){
 
 			//here we want to know where is the middle of one side of our square roundabout
 			//we calculate it between the first and second turn
-			if((nb_turn==1)&&(!debut)){
+			if((nb_turn==FIRST_TURN)&&(!debut)){
 				debut=left_motor_get_pos();
 			}
-			if((nb_turn==2)&&(debut)&&(!fin)){
+			if((nb_turn==SECOND_TURN)&&(debut)&&(!fin)){
 				fin=left_motor_get_pos();
 				position_to_reach=0.5*(fin-debut);
 			}
@@ -408,7 +415,7 @@ void pedestrian_crossing(void){
  */
 void send_to_computer(TO_DO instruction){
 	static uint8_t mustSend = 0;
-	if(mustSend > 8){
+	if(mustSend > MAX_COUNTER){
 	chprintf((BaseSequentialStream *)&SD3, "lineWidth= %d \r\n", get_lineWidth());
 	chprintf((BaseSequentialStream *)&SD3, "sound= %f \r\n",get_norm());
 	chprintf((BaseSequentialStream *)&SD3, "place dimension= %d \r\n",to_computer_dim);
@@ -541,7 +548,7 @@ static THD_FUNCTION(Movement, arg) {
 					if(wait){
 						//stop the motors and wait 3 seconds
 						stop_motors();
-						chThdSleepMilliseconds(3000);
+						chThdSleepMilliseconds(PEDESTRIAN_CROSSING_WAIT_TIME);
 						wait=false;
 					}
 					//cross the pedestrian crossing if no obstacle(pedestrian) is detected
@@ -565,12 +572,12 @@ static THD_FUNCTION(Movement, arg) {
 			clear_leds();
 			//park is always the last instruction in every set of instructions on the way out
 			//once the park done , wait 5 seconds
-			chThdSleepMilliseconds(5000);
+			chThdSleepMilliseconds(PARK_WAIT_TIME);
 			//then start the way back home by leaving the parking so without changing the instruction "PARK"
 			wayback=true;
 		}
 
-		chThdSleepUntilWindowed(time, time + MS2ST(10)); // Refresh @ 100 Hz
+		chThdSleepUntilWindowed(time, time + MS2ST(FREQUENCY_100HZ)); // Refresh @ 100 Hz
 	}
  }
 
