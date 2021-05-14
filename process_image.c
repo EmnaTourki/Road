@@ -12,8 +12,8 @@
 #define WIDTH_SLOPE							5		//pixels
 #define MIN_LINE_WIDTH						40		//pixels
 #define PASSAGE_PIETON_LINE_WIDTH			200		//pixels
-#define COUNTER_MAX_VALUE					7
-#define COUNTER_FIN_MAX_VALUE				10
+#define COUNTER_MAX_VALUE					10
+#define COUNTER_FIN_MAX_VALUE				50
 #define BUFFER_LINE							280
 
 static uint16_t lineWidth = 0;
