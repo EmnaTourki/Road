@@ -1,3 +1,5 @@
+//amended from tp4_Camreg
+
 #include "ch.h"
 #include "hal.h"
 #include <chprintf.h>
