@@ -28,7 +28,7 @@
 #define CORRECTION_ROTATION_90 			1
 #define DEFAULT_SIDE_LENGTH				1000						// steps
 #define DEFAULT_SPEED					0.6 * MOTOR_SPEED_LIMIT 	// step/s
-#define LOW_SPEED_COEF					0.1
+#define LOW_SPEED_COEF					0.105
 #define LOW_SPEED_COEF_PARK				0.13
 #define NORMAL_SPEED_COEF				0.5
 #define LOWER_SPEED_COEF				0.45
@@ -67,7 +67,7 @@ static int16_t leftSpeed = 0, rightSpeed = 0;
 static uint8_t done=true;
 static uint8_t parkdone=false;
 static int32_t to_computer_dim=0;
-static int8_t nb_instruction=NO_INSTRUCTION;
+
 
 
 
@@ -419,7 +419,7 @@ void send_to_computer(TO_DO instruction){
 	chprintf((BaseSequentialStream *)&SD3, "lineWidth= %d \r\n", get_lineWidth());
 	chprintf((BaseSequentialStream *)&SD3, "sound= %f \r\n",get_norm());
 	chprintf((BaseSequentialStream *)&SD3, "place dimension= %d \r\n",to_computer_dim);
-	chprintf((BaseSequentialStream *)&SD3, "INSTRUCTION= %d,nb_instruction= %d, distance= %d \r\n",instruction,nb_instruction,VL53L0X_get_dist_mm());
+	chprintf((BaseSequentialStream *)&SD3, "INSTRUCTION= %d,distance= %d \r\n",instruction,VL53L0X_get_dist_mm());
 	chprintf((BaseSequentialStream *)&SD3, "speed: %4d,%4d,\r\n",leftSpeed,rightSpeed);
 	chprintf((BaseSequentialStream *)&SD3, "Calibrated IR: %4d,%4d,%4d,%4d,%4d,%4d,%4d,%4d,\r\n\n", get_calibrated_prox(IR1), get_calibrated_prox(IR2),
 	get_calibrated_prox(IR3),get_calibrated_prox(IR4), get_calibrated_prox(IR5), get_calibrated_prox(IR6), get_calibrated_prox(IR7), get_calibrated_prox(IR8));
@@ -437,8 +437,7 @@ static THD_FUNCTION(Movement, arg) {
     systime_t time;
     TO_DO instruction=0;
     TO_DO instruction_tab[MAX_NB_INSTRUCTION]={0};
-   // int8_t nb_instruction=NO_INSTRUCTION;
-    nb_instruction=NO_INSTRUCTION;
+    int8_t nb_instruction=NO_INSTRUCTION;
     uint8_t wait=false,wayback=false,the_end=false;
     done=true;
     parkdone=false;
